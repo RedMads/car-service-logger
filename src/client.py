@@ -152,7 +152,8 @@ class WorkshopApp:
         # Remove the old rows, then add one row per car
         self.table.delete(*self.table.get_children())
         if len(data["cars"]) == 0:
-            self.showMessage("No cars yet")
+            # Show a note inside the table (keeps the last message visible)
+            self.table.insert("", "end", values=("", "No cars yet", "", "", "", ""))
         for car in data["cars"]:
             self.table.insert("", "end", values=(
                 car["id"], car["car_name"], car["owner"],
@@ -219,6 +220,8 @@ class WorkshopApp:
         if not selection:
             return
         row_values = self.table.item(selection[0])["values"]
+        if row_values[0] == "":
+            return  # the "No cars yet" row is not a real car
 
         self.selected_id = row_values[0]
         self.car_name_entry.delete(0, "end")
