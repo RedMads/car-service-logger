@@ -22,6 +22,15 @@ SERVICES = ["Oil change", "Brakes", "Tires", "AC", "Engine", "Other"]
 STATUSES = ["Waiting", "Done"]
 MAX_COST = 100000
 
+# Friendly names used in error messages
+FIELD_LABELS = {
+    "car_name": "Car name",
+    "owner": "Owner",
+    "service": "Service",
+    "cost": "Cost",
+    "status": "Status",
+}
+
 
 def checkCarForm(form):
     """Check the form values sent by the window.
@@ -41,7 +50,7 @@ def checkCarForm(form):
     # 2. No field may be empty
     for field_name, value in data.items():
         if value == "":
-            return None, f"{field_name} is required"
+            return None, f"{FIELD_LABELS[field_name]} is required"
 
     # 3. Cost must be a number between 0 and MAX_COST
     try:
