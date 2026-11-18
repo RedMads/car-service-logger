@@ -1,0 +1,11 @@
+# Python virtual environment and caches
+venv/
+__pycache__/
+*.pyc
+
+# Files created when the app runs
+src/cars.db
+src/report.txt
+
+# Course material (not part of the code)
+*.pdf
