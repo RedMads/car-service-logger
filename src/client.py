@@ -122,7 +122,11 @@ class WorkshopApp:
         self.table.bind("<<TreeviewSelect>>", self.onSelect)
 
     def buildMessages(self):
-        """A label at the bottom that shows success and error messages."""
+        """Total cost label and a message label at the bottom."""
+        self.total_label = ttk.Label(self.root, text="Total cost: 0.00 SAR",
+                                     font=("TkDefaultFont", 11, "bold"), padding=(10, 0))
+        self.total_label.pack(fill="x")
+
         self.message_label = ttk.Label(self.root, text="", padding=10)
         self.message_label.pack(fill="x")
 
@@ -159,6 +163,17 @@ class WorkshopApp:
                 car["id"], car["car_name"], car["owner"],
                 car["service"], f"{car['cost']:.2f}", car["status"],
             ))
+
+        # The total changes whenever the list changes
+        self.loadTotal()
+
+    def loadTotal(self):
+        """Extra feature: GET /total and show it under the table."""
+        data, error = sendRequest("/total")
+        if error:
+            self.showError(error)
+            return
+        self.total_label.config(text=f"Total cost: {data['total']:.2f} SAR")
 
 
     def getFormValues(self):
