@@ -41,3 +41,23 @@ class CarDB:
                 )
             """)
         connection.close()
+
+    def getAll(self):
+        """Return every car as a list of dicts (empty list if none)."""
+        connection = self.connect()
+        try:
+            rows = connection.execute("SELECT * FROM cars ORDER BY id").fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            connection.close()
+
+    def getOne(self, car_id):
+        """Return one car as a dict, or None if the ID does not exist."""
+        connection = self.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM cars WHERE id = ?", (car_id,)
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            connection.close()
