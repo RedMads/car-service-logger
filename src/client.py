@@ -9,7 +9,7 @@ Start the server first, then run:  python src/client.py
 import json
 import socket
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -127,18 +127,32 @@ class WorkshopApp:
         self.message_label.pack(fill="x")
 
     def showMessage(self, text):
-        """Show a short message at the bottom of the window."""
-        self.message_label.config(text=text)
+        """Show a success message at the bottom of the window."""
+        self.message_label.config(text=text, foreground="green")
+
+    def showError(self, text):
+        """Show an error at the bottom and in a popup box."""
+        self.message_label.config(text=text, foreground="red")
+        messagebox.showerror("Error", text)
+
+    def checkSelected(self):
+        """Return True if a car is selected, otherwise show an error."""
+        if self.selected_id is None:
+            self.showError("Please select a car first")
+            return False
+        return True
 
     def loadCars(self):
         """GET /cars and fill the table."""
         data, error = sendRequest("/cars")
         if error:
-            self.showMessage(error)
+            self.showError(error)
             return
 
         # Remove the old rows, then add one row per car
         self.table.delete(*self.table.get_children())
+        if len(data["cars"]) == 0:
+            self.showMessage("No cars yet")
         for car in data["cars"]:
             self.table.insert("", "end", values=(
                 car["id"], car["car_name"], car["owner"],
@@ -160,7 +174,7 @@ class WorkshopApp:
         """POST /cars/add with the form values."""
         data, error = sendRequest("/cars/add", self.getFormValues())
         if error:
-            self.showMessage(error)
+            self.showError(error)
             return
         self.showMessage(data["message"])
         self.clearForm()
@@ -168,18 +182,32 @@ class WorkshopApp:
 
     def updateCar(self):
         """POST /cars/<id>/edit for the selected car."""
+        if not self.checkSelected():
+            return
         data, error = sendRequest(f"/cars/{self.selected_id}/edit", self.getFormValues())
         if error:
-            self.showMessage(error)
+            self.showError(error)
+            if error == "Car not found":
+                self.clearForm()
+                self.loadCars()
             return
         self.showMessage(data["message"])
         self.loadCars()
 
     def deleteCar(self):
-        """POST /cars/<id>/delete for the selected car."""
+        """Ask for confirmation, then POST /cars/<id>/delete."""
+        if not self.checkSelected():
+            return
+        car_name = self.car_name_entry.get()
+        if not messagebox.askyesno("Confirm", f"Delete car {self.selected_id} ({car_name})?"):
+            return
+
         data, error = sendRequest(f"/cars/{self.selected_id}/delete", {})
         if error:
-            self.showMessage(error)
+            self.showError(error)
+            if error == "Car not found":
+                self.clearForm()
+                self.loadCars()
             return
         self.showMessage(data["message"])
         self.clearForm()
