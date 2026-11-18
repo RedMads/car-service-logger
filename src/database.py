@@ -61,3 +61,41 @@ class CarDB:
             return dict(row) if row else None
         finally:
             connection.close()
+
+    def add(self, car_name, owner, service, cost, status):
+        """Insert a new car record."""
+        connection = self.connect()
+        try:
+            connection.execute(
+                "INSERT INTO cars (car_name, owner, service, cost, status) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (car_name, owner, service, cost, status),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def edit(self, car_id, car_name, owner, service, cost, status):
+        """Change one car. Return True if found, False if the ID is unknown."""
+        connection = self.connect()
+        try:
+            cursor = connection.execute(
+                "UPDATE cars SET car_name = ?, owner = ?, service = ?, "
+                "cost = ?, status = ? WHERE id = ?",
+                (car_name, owner, service, cost, status, car_id),
+            )
+            connection.commit()
+            # rowcount is 0 when no row had this ID
+            return cursor.rowcount > 0
+        finally:
+            connection.close()
+
+    def delete(self, car_id):
+        """Remove one car. Return True if found, False if the ID is unknown."""
+        connection = self.connect()
+        try:
+            cursor = connection.execute("DELETE FROM cars WHERE id = ?", (car_id,))
+            connection.commit()
+            return cursor.rowcount > 0
+        finally:
+            connection.close()
