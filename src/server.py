@@ -105,5 +105,33 @@ def addCar():
     return jsonify({"message": "Car added"}), 201
 
 
+@app.route("/cars/<int:car_id>/edit", methods=["POST"])
+def editCar(car_id):
+    """Check the values, then change one car (404 if the ID is unknown)."""
+    data, error = checkCarForm(request.form)
+    if error:
+        return jsonify({"error": error}), 400
+    try:
+        found = db.edit(car_id, data["car_name"], data["owner"],
+                        data["service"], data["cost"], data["status"])
+    except sqlite3.Error:
+        return jsonify({"error": "Database error"}), 500
+    if not found:
+        return jsonify({"error": "Car not found"}), 404
+    return jsonify({"message": "Car updated"})
+
+
+@app.route("/cars/<int:car_id>/delete", methods=["POST"])
+def deleteCar(car_id):
+    """Delete one car (404 if the ID is unknown)."""
+    try:
+        found = db.delete(car_id)
+    except sqlite3.Error:
+        return jsonify({"error": "Database error"}), 500
+    if not found:
+        return jsonify({"error": "Car not found"}), 404
+    return jsonify({"message": "Car deleted"})
+
+
 if __name__ == "__main__":
     app.run(port=5050)
