@@ -57,7 +57,11 @@ class WorkshopApp:
         self.root = root
         self.root.title("Car Workshop Service Log")
 
+        # ID of the row the user clicked (None = nothing selected)
+        self.selected_id = None
+
         self.buildForm()
+        self.buildButtons()
         self.buildTable()
         self.buildMessages()
 
@@ -91,6 +95,17 @@ class WorkshopApp:
         self.status_box.grid(row=2, column=1, padx=5, pady=3)
         self.status_box.set(STATUSES[0])
 
+    def buildButtons(self):
+        """One row of action buttons."""
+        buttons = ttk.Frame(self.root, padding=(10, 0))
+        buttons.pack(fill="x")
+
+        ttk.Button(buttons, text="Add", command=self.addCar).pack(side="left", padx=3)
+        ttk.Button(buttons, text="Update", command=self.updateCar).pack(side="left", padx=3)
+        ttk.Button(buttons, text="Delete", command=self.deleteCar).pack(side="left", padx=3)
+        ttk.Button(buttons, text="Clear", command=self.clearForm).pack(side="left", padx=3)
+        ttk.Button(buttons, text="Refresh", command=self.loadCars).pack(side="left", padx=3)
+
     def buildTable(self):
         """The table (Treeview) that lists the saved cars."""
         columns = ("id", "car_name", "owner", "service", "cost", "status")
@@ -101,7 +116,10 @@ class WorkshopApp:
             self.table.heading(column, text=heading)
             self.table.column(column, width=110)
         self.table.column("id", width=40)
-        self.table.pack(fill="both", expand=True, padx=10)
+        self.table.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # When the user clicks a row, copy it into the inputs
+        self.table.bind("<<TreeviewSelect>>", self.onSelect)
 
     def buildMessages(self):
         """A label at the bottom that shows success and error messages."""
@@ -126,6 +144,73 @@ class WorkshopApp:
                 car["id"], car["car_name"], car["owner"],
                 car["service"], f"{car['cost']:.2f}", car["status"],
             ))
+
+
+    def getFormValues(self):
+        """Read the inputs into a dict (the server checks them)."""
+        return {
+            "car_name": self.car_name_entry.get(),
+            "owner": self.owner_entry.get(),
+            "service": self.service_box.get(),
+            "cost": self.cost_entry.get(),
+            "status": self.status_box.get(),
+        }
+
+    def addCar(self):
+        """POST /cars/add with the form values."""
+        data, error = sendRequest("/cars/add", self.getFormValues())
+        if error:
+            self.showMessage(error)
+            return
+        self.showMessage(data["message"])
+        self.clearForm()
+        self.loadCars()
+
+    def updateCar(self):
+        """POST /cars/<id>/edit for the selected car."""
+        data, error = sendRequest(f"/cars/{self.selected_id}/edit", self.getFormValues())
+        if error:
+            self.showMessage(error)
+            return
+        self.showMessage(data["message"])
+        self.loadCars()
+
+    def deleteCar(self):
+        """POST /cars/<id>/delete for the selected car."""
+        data, error = sendRequest(f"/cars/{self.selected_id}/delete", {})
+        if error:
+            self.showMessage(error)
+            return
+        self.showMessage(data["message"])
+        self.clearForm()
+        self.loadCars()
+
+    def onSelect(self, event):
+        """Fill the inputs with the clicked row."""
+        selection = self.table.selection()
+        if not selection:
+            return
+        row_values = self.table.item(selection[0])["values"]
+
+        self.selected_id = row_values[0]
+        self.car_name_entry.delete(0, "end")
+        self.car_name_entry.insert(0, row_values[1])
+        self.owner_entry.delete(0, "end")
+        self.owner_entry.insert(0, row_values[2])
+        self.service_box.set(row_values[3])
+        self.cost_entry.delete(0, "end")
+        self.cost_entry.insert(0, row_values[4])
+        self.status_box.set(row_values[5])
+
+    def clearForm(self):
+        """Empty the inputs and forget the selected car."""
+        self.selected_id = None
+        self.car_name_entry.delete(0, "end")
+        self.owner_entry.delete(0, "end")
+        self.cost_entry.delete(0, "end")
+        self.service_box.set(SERVICES[0])
+        self.status_box.set(STATUSES[0])
+        self.table.selection_remove(self.table.selection())
 
 
 if __name__ == "__main__":
