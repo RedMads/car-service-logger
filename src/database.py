@@ -29,7 +29,8 @@ class CarDB:
 
     def createTable(self):
         """Create the cars table only if it is missing (keeps old records)."""
-        with self.connect() as connection:
+        connection = self.connect()
+        try:
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS cars (
                     id       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +41,10 @@ class CarDB:
                     status   TEXT NOT NULL
                 )
             """)
-        connection.close()
+            connection.commit()
+        finally:
+            # Always close the connection, even if an error happened
+            connection.close()
 
     def getAll(self):
         """Return every car as a list of dicts (empty list if none)."""
