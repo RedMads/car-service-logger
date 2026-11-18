@@ -133,5 +133,15 @@ def deleteCar(car_id):
     return jsonify({"message": "Car deleted"})
 
 
+@app.route("/total", methods=["GET"])
+def getTotal():
+    """Extra feature: total cost of all services."""
+    try:
+        total = db.totalCost()
+    except sqlite3.Error:
+        return jsonify({"error": "Database error"}), 500
+    return jsonify({"total": total})
+
+
 if __name__ == "__main__":
     app.run(port=5050)

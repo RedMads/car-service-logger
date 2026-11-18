@@ -103,3 +103,13 @@ class CarDB:
             return cursor.rowcount > 0
         finally:
             connection.close()
+
+    def totalCost(self):
+        """Extra feature: the sum of all costs (0 if there are no cars)."""
+        connection = self.connect()
+        try:
+            row = connection.execute("SELECT SUM(cost) AS total FROM cars").fetchone()
+            # SUM gives NULL (None) for an empty table, so use 0 instead
+            return row["total"] or 0
+        finally:
+            connection.close()
