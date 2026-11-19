@@ -77,22 +77,26 @@ class WorkshopApp:
         self.car_name_entry = ttk.Entry(form, width=25)
         self.car_name_entry.grid(row=0, column=1, padx=5, pady=3)
 
-        ttk.Label(form, text="Owner:").grid(row=0, column=2, sticky="w")
-        self.owner_entry = ttk.Entry(form, width=25)
-        self.owner_entry.grid(row=0, column=3, padx=5, pady=3)
+        ttk.Label(form, text="Plate (1234 ABC):").grid(row=0, column=2, sticky="w")
+        self.plate_entry = ttk.Entry(form, width=25)
+        self.plate_entry.grid(row=0, column=3, padx=5, pady=3)
 
-        ttk.Label(form, text="Service:").grid(row=1, column=0, sticky="w")
+        ttk.Label(form, text="Owner:").grid(row=1, column=0, sticky="w")
+        self.owner_entry = ttk.Entry(form, width=25)
+        self.owner_entry.grid(row=1, column=1, padx=5, pady=3)
+
+        ttk.Label(form, text="Service:").grid(row=1, column=2, sticky="w")
         self.service_box = ttk.Combobox(form, values=SERVICES, state="readonly", width=22)
-        self.service_box.grid(row=1, column=1, padx=5, pady=3)
+        self.service_box.grid(row=1, column=3, padx=5, pady=3)
         self.service_box.set(SERVICES[0])
 
-        ttk.Label(form, text="Cost (SAR):").grid(row=1, column=2, sticky="w")
+        ttk.Label(form, text="Cost (SAR):").grid(row=2, column=0, sticky="w")
         self.cost_entry = ttk.Entry(form, width=25)
-        self.cost_entry.grid(row=1, column=3, padx=5, pady=3)
+        self.cost_entry.grid(row=2, column=1, padx=5, pady=3)
 
-        ttk.Label(form, text="Status:").grid(row=2, column=0, sticky="w")
+        ttk.Label(form, text="Status:").grid(row=2, column=2, sticky="w")
         self.status_box = ttk.Combobox(form, values=STATUSES, state="readonly", width=22)
-        self.status_box.grid(row=2, column=1, padx=5, pady=3)
+        self.status_box.grid(row=2, column=3, padx=5, pady=3)
         self.status_box.set(STATUSES[0])
 
     def buildButtons(self):
@@ -108,8 +112,8 @@ class WorkshopApp:
 
     def buildTable(self):
         """The table (Treeview) that lists the saved cars."""
-        columns = ("id", "car_name", "owner", "service", "cost", "status")
-        headings = ("ID", "Car", "Owner", "Service", "Cost (SAR)", "Status")
+        columns = ("id", "car_name", "plate", "owner", "service", "cost", "status")
+        headings = ("ID", "Car", "Plate", "Owner", "Service", "Cost (SAR)", "Status")
 
         self.table = ttk.Treeview(self.root, columns=columns, show="headings", height=10)
         for column, heading in zip(columns, headings):
@@ -157,10 +161,10 @@ class WorkshopApp:
         self.table.delete(*self.table.get_children())
         if len(data["cars"]) == 0:
             # Show a note inside the table (keeps the last message visible)
-            self.table.insert("", "end", values=("", "No cars yet", "", "", "", ""))
+            self.table.insert("", "end", values=("", "No cars yet", "", "", "", "", ""))
         for car in data["cars"]:
             self.table.insert("", "end", values=(
-                car["id"], car["car_name"], car["owner"],
+                car["id"], car["car_name"], car["plate"], car["owner"],
                 car["service"], f"{car['cost']:.2f}", car["status"],
             ))
 
@@ -180,6 +184,7 @@ class WorkshopApp:
         """Read the inputs into a dict (the server checks them)."""
         return {
             "car_name": self.car_name_entry.get(),
+            "plate": self.plate_entry.get(),
             "owner": self.owner_entry.get(),
             "service": self.service_box.get(),
             "cost": self.cost_entry.get(),
@@ -241,17 +246,20 @@ class WorkshopApp:
         self.selected_id = row_values[0]
         self.car_name_entry.delete(0, "end")
         self.car_name_entry.insert(0, row_values[1])
+        self.plate_entry.delete(0, "end")
+        self.plate_entry.insert(0, row_values[2])
         self.owner_entry.delete(0, "end")
-        self.owner_entry.insert(0, row_values[2])
-        self.service_box.set(row_values[3])
+        self.owner_entry.insert(0, row_values[3])
+        self.service_box.set(row_values[4])
         self.cost_entry.delete(0, "end")
-        self.cost_entry.insert(0, row_values[4])
-        self.status_box.set(row_values[5])
+        self.cost_entry.insert(0, row_values[5])
+        self.status_box.set(row_values[6])
 
     def clearForm(self):
         """Empty the inputs and forget the selected car."""
         self.selected_id = None
         self.car_name_entry.delete(0, "end")
+        self.plate_entry.delete(0, "end")
         self.owner_entry.delete(0, "end")
         self.cost_entry.delete(0, "end")
         self.service_box.set(SERVICES[0])
