@@ -1,7 +1,7 @@
 # Car Workshop Service Log
 
 A small desktop app for a car workshop. The employee records each car that comes in
-(car, owner, service, cost in SAR, status `Waiting` / `Done`) and can add, view, edit
+(car, license plate, owner, service, cost in SAR, status `Waiting` / `Done`) and can add, view, edit
 and delete records. The extra feature is a **Total cost** label that sums all services.
 It helps small workshops that still write cars on paper.
 
@@ -36,6 +36,10 @@ pip install -r requirements.txt
 
 Nothing to do by hand. When `server.py` starts it calls `CarDB.createTable()`, which runs
 `CREATE TABLE IF NOT EXISTS`. The table is created only if it is missing, so old records are kept.
+If an older `cars.db` has no `plate` column, `createTable()` adds it (old cars get an empty plate).
+
+The license plate uses the Saudi format: 1-4 numbers, a space, then 3 English letters,
+for example `1234 ABC`. Lowercase or no space (`1234abc`) is accepted and saved as `1234 ABC`.
 The database file is `src/cars.db`.
 
 ## Run
@@ -83,7 +87,7 @@ python src/report.py      # terminal 3 - writes src/report.txt
    it to `http://127.0.0.1:5050/cars/add` using `urlopen(..., timeout=5)`.
 3. Flask's `addCar()` reads `request.form` and calls `checkCarForm()`. Bad values give JSON
    `{"error": ...}` with status 400.
-4. Good values go to `CarDB.add()`, which runs `INSERT ... VALUES (?, ?, ?, ?, ?)`, commits and closes.
+4. Good values go to `CarDB.add()`, which runs `INSERT ... VALUES (?, ?, ?, ?, ?, ?)`, commits and closes.
 5. Flask replies `{"message": "Car added"}` (201). The window shows the message and reloads the table and total.
 
 ## Test results
@@ -96,6 +100,9 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | Stop and restart Flask → records still there | Pass |
 | Empty car name → "Car name is required" | Pass |
 | Cost `abc` → "Cost must be a number" | Pass |
+| Plate `ABC 123` or `12345 ABC` → "Plate must be 1-4 numbers then 3 letters, like 1234 ABC" | Pass |
+| Plate typed as `4321abc` → saved as `4321 ABC` | Pass |
+| Old `cars.db` without a plate column → column added on start, old cars keep their data | Pass |
 | Cost `-5` → "Cost must be between 0 and 100000" | Pass |
 | Empty database → table shows "No cars yet", total 0.00 | Pass |
 | Unknown ID: same car selected in two windows, deleted in one, edited in the other → "Car not found" (404) | Pass |
