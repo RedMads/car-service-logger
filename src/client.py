@@ -135,7 +135,7 @@ class WorkshopApp:
 
     def buildMessages(self):
         """Total cost label and a message label at the bottom."""
-        self.total_label = ttk.Label(self.root, text="Total cost: 0.00 SAR",
+        self.total_label = ttk.Label(self.root, text="Total: 0.00 SAR",
                                      font=("TkDefaultFont", 11, "bold"), padding=(10, 0))
         self.total_label.pack(fill="x")
 
@@ -186,7 +186,7 @@ class WorkshopApp:
         if error:
             self.showError(error)
             return
-        self.total_label.config(text=f"Total cost: {data['total']:.2f} SAR")
+        self.total_label.config(text=f"Total: {data['total']:.2f} SAR")
 
 
     def getFormValues(self):

@@ -2,7 +2,7 @@
 
 A small desktop app for a car workshop. The employee records each car that comes in
 (car, license plate, odometer, owner, service, cost in SAR, status `Waiting` / `Done`) and can add, view, edit
-and delete records. The extra feature is a **Total cost** label that sums all services.
+and delete records. The extra feature is a **Total** label that sums the cost of all services.
 It helps small workshops that still write cars on paper.
 
 ```
