@@ -52,6 +52,12 @@ def sendRequest(path, values=None):
         return None, "The server took too long to reply."
 
 
+def setText(entry, text):
+    """Replace the text inside an input box."""
+    entry.delete(0, "end")
+    entry.insert(0, text)
+
+
 class WorkshopApp:
     """The main window: inputs, buttons, table and messages."""
 
@@ -154,6 +160,13 @@ class WorkshopApp:
         self.message_label.config(text=text, foreground="red")
         messagebox.showerror("Error", text)
 
+    def showRequestError(self, error):
+        """Show a server error. If the car was deleted meanwhile, reload the list."""
+        self.showError(error)
+        if error == "Car not found":
+            self.clearForm()
+            self.loadCars()
+
     def checkSelected(self):
         """Return True if a car is selected, otherwise show an error."""
         if self.selected_id is None:
@@ -172,12 +185,11 @@ class WorkshopApp:
         self.table.delete(*self.table.get_children())
         if len(data["cars"]) == 0:
             # Show a note inside the table (keeps the last message visible)
-            self.table.insert("", "end", values=("", "No cars yet", "", "", "", "", "", ""))
+            self.table.insert("", "end", values=("", "No cars yet"))
         for car in data["cars"]:
             self.table.insert("", "end", values=(
                 car["id"], car["car_name"], car["plate"], f"{car['odometer']:,}",
-                car["owner"],
-                car["service"], f"{car['cost']:.2f}", car["status"],
+                car["owner"], car["service"], f"{car['cost']:.2f}", car["status"],
             ))
 
         # The total changes whenever the list changes
@@ -190,7 +202,6 @@ class WorkshopApp:
             self.showError(error)
             return
         self.total_label.config(text=f"Total: {data['total']:.2f} SAR")
-
 
     def showStats(self):
         """Extra feature: GET /stats and open the Statistics window."""
@@ -228,10 +239,7 @@ class WorkshopApp:
             return
         data, error = sendRequest(f"/cars/{self.selected_id}/edit", self.getFormValues())
         if error:
-            self.showError(error)
-            if error == "Car not found":
-                self.clearForm()
-                self.loadCars()
+            self.showRequestError(error)
             return
         self.showMessage(data["message"])
         self.loadCars()
@@ -246,10 +254,7 @@ class WorkshopApp:
 
         data, error = sendRequest(f"/cars/{self.selected_id}/delete", {})
         if error:
-            self.showError(error)
-            if error == "Car not found":
-                self.clearForm()
-                self.loadCars()
+            self.showRequestError(error)
             return
         self.showMessage(data["message"])
         self.clearForm()
@@ -264,20 +269,17 @@ class WorkshopApp:
         if row_values[0] == "":
             return  # the "No cars yet" row is not a real car
 
-        self.selected_id = row_values[0]
-        self.car_name_entry.delete(0, "end")
-        self.car_name_entry.insert(0, row_values[1])
-        self.plate_entry.delete(0, "end")
-        self.plate_entry.insert(0, row_values[2])
-        self.odometer_entry.delete(0, "end")
-        self.odometer_entry.insert(0, row_values[3])
-        self.owner_entry.delete(0, "end")
-        self.owner_entry.insert(0, row_values[4])
-        self.service_box.set(row_values[5])
-        self.last_service = str(row_values[5])
-        self.cost_entry.delete(0, "end")
-        self.cost_entry.insert(0, row_values[6])
-        self.status_box.set(row_values[7])
+        # Same order as the table columns
+        car_id, car_name, plate, odometer, owner, service, cost, status = row_values
+        self.selected_id = car_id
+        setText(self.car_name_entry, car_name)
+        setText(self.plate_entry, plate)
+        setText(self.odometer_entry, odometer)
+        setText(self.owner_entry, owner)
+        setText(self.cost_entry, cost)
+        self.service_box.set(service)
+        self.last_service = str(service)
+        self.status_box.set(status)
 
     def onServiceSelect(self, event):
         """If the user picks "Other", open a popup to type the service name."""
@@ -297,11 +299,9 @@ class WorkshopApp:
     def clearForm(self):
         """Empty the inputs and forget the selected car."""
         self.selected_id = None
-        self.car_name_entry.delete(0, "end")
-        self.plate_entry.delete(0, "end")
-        self.odometer_entry.delete(0, "end")
-        self.owner_entry.delete(0, "end")
-        self.cost_entry.delete(0, "end")
+        for entry in (self.car_name_entry, self.plate_entry, self.odometer_entry,
+                      self.owner_entry, self.cost_entry):
+            setText(entry, "")
         self.service_box.set(SERVICES[0])
         self.last_service = SERVICES[0]
         self.status_box.set(STATUSES[0])
