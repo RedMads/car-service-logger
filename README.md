@@ -40,6 +40,10 @@ If an older `cars.db` has no `plate` column, `createTable()` adds it (old cars g
 
 The license plate uses the Saudi format: 1-4 numbers, a space, then 3 English letters,
 for example `1234 ABC`. Lowercase or no space (`1234abc`) is accepted and saved as `1234 ABC`.
+
+Choosing **Other** in the Service list opens a small popup where the service is typed
+(for example `Windshield repair`). Cancel keeps the service chosen before. Typed services
+can be up to 40 characters.
 The database file is `src/cars.db`.
 
 ## Run
@@ -76,7 +80,7 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | Classes | `src/database.py` `CarDB`, `src/client.py` `WorkshopApp` |
 | SQLite | `src/database.py` `CarDB` methods (`?` placeholders, one connection per call, commit, close) |
 | Threads & files | `src/report.py` `main()` (`Thread`, `start()`, `join()`) + `writeReport()` (`with open(..., encoding="utf-8")`) |
-| Tkinter | `src/client.py` `WorkshopApp` (labels, entries, comboboxes, buttons, Treeview, messagebox) |
+| Tkinter | `src/client.py` `WorkshopApp` (labels, entries, comboboxes, buttons, Treeview, messagebox, simpledialog in `onServiceSelect()`) |
 | Client & server | `src/client.py` `WorkshopApp.addCar()` → `sendRequest("/cars/add", values)` → `src/server.py` `addCar()` → `CarDB.add()` → JSON `{"message": "Car added"}` |
 | Flask | `src/server.py` routes + `checkCarForm()` + `jsonify` replies |
 
@@ -102,6 +106,9 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | Cost `abc` → "Cost must be a number" | Pass |
 | Plate `ABC 123` or `12345 ABC` → "Plate must be 1-4 numbers then 3 letters, like 1234 ABC" | Pass |
 | Plate typed as `4321abc` → saved as `4321 ABC` | Pass |
+| Service **Other** → popup; typed `Windshield repair` is saved and shown in the table | Pass |
+| Service **Other** → Cancel or empty text → service goes back to the previous choice | Pass |
+| Typed service longer than 40 characters → "Service must be 40 characters or less" | Pass |
 | Old `cars.db` without a plate column → column added on start, old cars keep their data | Pass |
 | Cost `-5` → "Cost must be between 0 and 100000" | Pass |
 | Empty database → table shows "No cars yet", total 0.00 | Pass |

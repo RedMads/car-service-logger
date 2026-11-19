@@ -9,7 +9,7 @@ Start the server first, then run:  python src/client.py
 import json
 import socket
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -89,6 +89,9 @@ class WorkshopApp:
         self.service_box = ttk.Combobox(form, values=SERVICES, state="readonly", width=22)
         self.service_box.grid(row=1, column=3, padx=5, pady=3)
         self.service_box.set(SERVICES[0])
+        # Remember the last good service, so Cancel in the "Other" popup can go back to it
+        self.last_service = SERVICES[0]
+        self.service_box.bind("<<ComboboxSelected>>", self.onServiceSelect)
 
         ttk.Label(form, text="Cost (SAR):").grid(row=2, column=0, sticky="w")
         self.cost_entry = ttk.Entry(form, width=25)
@@ -251,9 +254,25 @@ class WorkshopApp:
         self.owner_entry.delete(0, "end")
         self.owner_entry.insert(0, row_values[3])
         self.service_box.set(row_values[4])
+        self.last_service = str(row_values[4])
         self.cost_entry.delete(0, "end")
         self.cost_entry.insert(0, row_values[5])
         self.status_box.set(row_values[6])
+
+    def onServiceSelect(self, event):
+        """If the user picks "Other", open a popup to type the service name."""
+        if self.service_box.get() != "Other":
+            self.last_service = self.service_box.get()
+            return
+
+        typed = simpledialog.askstring("Other service", "Type the service:",
+                                       parent=self.root)
+        if typed is None or typed.strip() == "":
+            # Cancel or empty: go back to the service chosen before
+            self.service_box.set(self.last_service)
+            return
+        self.service_box.set(typed.strip())
+        self.last_service = typed.strip()
 
     def clearForm(self):
         """Empty the inputs and forget the selected car."""
@@ -263,6 +282,7 @@ class WorkshopApp:
         self.owner_entry.delete(0, "end")
         self.cost_entry.delete(0, "end")
         self.service_box.set(SERVICES[0])
+        self.last_service = SERVICES[0]
         self.status_box.set(STATUSES[0])
         self.table.selection_remove(self.table.selection())
 

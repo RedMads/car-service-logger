@@ -18,9 +18,10 @@ app = Flask(__name__)
 db = CarDB()
 db.createTable()  # create the table at start-up if it is missing
 
-# Allowed choices (the window shows the same lists)
-SERVICES = ["Oil change", "Brakes", "Tires", "AC", "Engine", "Other"]
+# Allowed status choices (the window shows the same list).
+# Service is free text: the window offers a list, and "Other" lets the user type one.
 STATUSES = ["Waiting", "Done"]
+MAX_SERVICE_LENGTH = 40
 MAX_COST = 100000
 
 # Saudi plate: 1 to 4 numbers, a space, then 3 English letters, like "1234 ABC".
@@ -73,9 +74,11 @@ def checkCarForm(form):
         return None, "Plate must be 1-4 numbers then 3 letters, like 1234 ABC"
     data["plate"] = f"{match.group(1)} {match.group(2)}"
 
-    # 5. Service and status must be one of the allowed choices
-    if data["service"] not in SERVICES:
-        return None, "Unknown service"
+    # 5. Service can be typed by the user, so only limit its length
+    if len(data["service"]) > MAX_SERVICE_LENGTH:
+        return None, f"Service must be {MAX_SERVICE_LENGTH} characters or less"
+
+    # 6. Status must be one of the allowed choices
     if data["status"] not in STATUSES:
         return None, "Status must be Waiting or Done"
 
