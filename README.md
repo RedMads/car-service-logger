@@ -2,7 +2,8 @@
 
 A small desktop app for a car workshop. The employee records each car that comes in
 (car, license plate, odometer, owner, service, cost in SAR, status `Waiting` / `Done`) and can add, view, edit
-and delete records. The extra feature is a **Total** label that sums the cost of all services.
+and delete records. The extra features are a **Total** label that sums the cost of all services, and a
+**Statistics** button that opens a window with a summary and bar charts.
 It helps small workshops that still write cars on paper.
 
 ```
@@ -18,6 +19,7 @@ Final_project/
 │   ├── database.py   # class CarDB - all SQLite work
 │   ├── server.py     # Flask routes + input checks (port 5050)
 │   ├── client.py     # Tkinter window + HTTP requests
+│   ├── stats_window.py # Statistics window with bar charts
 │   └── report.py     # thread that writes report.txt
 ├── requirements.txt  # flask
 ├── README.md
@@ -49,6 +51,22 @@ Odometer is a whole number of km from 0 to 2,000,000. Commas are allowed when ty
 Choosing **Other** in the Service list opens a small popup where the service is typed
 (for example `Windshield repair`). Cancel keeps the service chosen before. Typed services
 can be up to 40 characters.
+
+### Statistics window
+
+Click **Statistics** (right side of the buttons). The window has five tabs:
+
+| Tab | What it shows |
+|---|---|
+| Summary | number of cars, Waiting / Done, total cost, average cost, average odometer |
+| Cars per model | how many cars of each model (the car name, upper/lower case ignored), top 10 |
+| Odometer per model | average km per model, top 10 |
+| Services | how many cars had each service |
+| Cost over time | total cost per day for the last 14 days that have cars |
+
+Each car gets a `created_at` date (the day it was added) for the cost-over-time chart.
+Editing a car keeps its date. Cars with 0 km are left out of the odometer averages.
+The charts are drawn on a Tkinter `Canvas`, so no extra library is needed.
 The database file is `src/cars.db`.
 
 ## Run
@@ -69,6 +87,7 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | POST   | `/cars/<car_id>/edit`       | edit a car                      | 200 / 400 / 404  |
 | POST   | `/cars/<car_id>/delete`     | delete a car                    | 200 / 404        |
 | GET    | `/total`                    | extra feature: total cost       | 200              |
+| GET    | `/stats`                    | extra feature: statistics       | 200              |
 
 ## Naming style
 
@@ -85,6 +104,8 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | Classes | `src/database.py` `CarDB`, `src/client.py` `WorkshopApp` |
 | SQLite | `src/database.py` `CarDB` methods (`?` placeholders, one connection per call, commit, close) |
 | Threads & files | `src/report.py` `main()` (`Thread`, `start()`, `join()`) + `writeReport()` (`with open(..., encoding="utf-8")`) |
+| Charts (Tkinter Canvas) | `src/stats_window.py` `StatsWindow` (Notebook tabs) + `drawBarChart()` |
+| SQL aggregates | `src/database.py` `CarDB.getStats()` (`COUNT`, `SUM`, `AVG`, `GROUP BY`) |
 | Tkinter | `src/client.py` `WorkshopApp` (labels, entries, comboboxes, buttons, Treeview, messagebox, simpledialog in `onServiceSelect()`) |
 | Client & server | `src/client.py` `WorkshopApp.addCar()` → `sendRequest("/cars/add", values)` → `src/server.py` `addCar()` → `CarDB.add()` → JSON `{"message": "Car added"}` |
 | Flask | `src/server.py` routes + `checkCarForm()` + `jsonify` replies |
@@ -123,6 +144,10 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | Unknown ID: same car selected in two windows, deleted in one, edited in the other → "Car not found" (404) | Pass |
 | Update/Delete with no row selected → "Please select a car first" | Pass |
 | Stop Flask, Refresh → "Cannot connect to the server. Is Flask running?"; start Flask, Refresh → works without restarting the window | Pass |
+| **Statistics** → summary + 4 charts (cars per model, odometer per model, services, cost per day) | Pass |
+| Statistics with an empty database → zeros and "No data yet" in every chart | Pass |
+| ` Toyota` and `toyota` → one model "Toyota" in the charts | Pass |
+| Old `cars.db` without `created_at` → column added, old cars dated today | Pass |
 | `python src/report.py` → `report.txt` with correct cars and total | Pass |
 | `report.py` with Flask stopped → clear connection error | Pass |
 

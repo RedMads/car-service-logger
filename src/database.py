@@ -7,6 +7,7 @@ Every method opens its own connection, does one job, and closes it.
 
 import os
 import sqlite3
+from datetime import date
 
 
 # The database file lives next to this script, so it is always the same file
@@ -40,7 +41,8 @@ class CarDB:
                     owner    TEXT NOT NULL,
                     service  TEXT NOT NULL,
                     cost     REAL NOT NULL,
-                    status   TEXT NOT NULL
+                    status   TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT ''
                 )
             """)
 
@@ -59,6 +61,15 @@ class CarDB:
             if "odometer" not in columns:
                 connection.execute(
                     "ALTER TABLE cars ADD COLUMN odometer INTEGER NOT NULL DEFAULT 0"
+                )
+            if "created_at" not in columns:
+                connection.execute(
+                    "ALTER TABLE cars ADD COLUMN created_at TEXT NOT NULL DEFAULT ''"
+                )
+                # Cars saved before dates existed get today's date
+                connection.execute(
+                    "UPDATE cars SET created_at = ? WHERE created_at = ''",
+                    (date.today().isoformat(),),
                 )
             connection.commit()
         finally:
@@ -90,9 +101,10 @@ class CarDB:
         connection = self.connect()
         try:
             connection.execute(
-                "INSERT INTO cars (car_name, plate, odometer, owner, service, cost, status) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (car_name, plate, odometer, owner, service, cost, status),
+                "INSERT INTO cars (car_name, plate, odometer, owner, service, cost, status, "
+                "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (car_name, plate, odometer, owner, service, cost, status,
+                 date.today().isoformat()),  # the day the car was added, like 2026-11-20
             )
             connection.commit()
         finally:
@@ -132,3 +144,62 @@ class CarDB:
             return row["total"] or 0
         finally:
             connection.close()
+
+    def getStats(self):
+        """Extra feature: numbers and groups for the Statistics window.
+
+        Returns a dict:
+          summary          -> cars, waiting, done, total_cost, average_cost, average_odometer
+          cars_by_model    -> [[model, number of cars], ...]  (top 10)
+          odometer_by_model-> [[model, average km], ...]      (top 10)
+          cars_by_service  -> [[service, number of cars], ...]
+          cost_by_day      -> [[date, total cost], ...]        (last 14 days with cars)
+        """
+        connection = self.connect()
+        try:
+            # COALESCE turns NULL (empty table) into 0.
+            # NULLIF(odometer, 0) skips cars with no odometer reading in the average.
+            summary = connection.execute("""
+                SELECT COUNT(*)                              AS cars,
+                       COALESCE(SUM(status = 'Waiting'), 0)  AS waiting,
+                       COALESCE(SUM(status = 'Done'), 0)     AS done,
+                       COALESCE(SUM(cost), 0)                AS total_cost,
+                       COALESCE(AVG(cost), 0)                AS average_cost,
+                       COALESCE(AVG(NULLIF(odometer, 0)), 0) AS average_odometer
+                FROM cars
+            """).fetchone()
+
+            # The model is the car name; LOWER(TRIM()) makes "Toyota " and "toyota" one model
+            cars_by_model = self.getPairs(connection, """
+                SELECT LOWER(TRIM(car_name)) AS model, COUNT(*)
+                FROM cars GROUP BY model ORDER BY COUNT(*) DESC, model LIMIT 10
+            """)
+            odometer_by_model = self.getPairs(connection, """
+                SELECT LOWER(TRIM(car_name)) AS model, AVG(odometer)
+                FROM cars WHERE odometer > 0
+                GROUP BY model ORDER BY AVG(odometer) DESC, model LIMIT 10
+            """)
+            cars_by_service = self.getPairs(connection, """
+                SELECT service, COUNT(*)
+                FROM cars GROUP BY service ORDER BY COUNT(*) DESC, service
+            """)
+            # Newest 14 days, then turned back to oldest-first for the chart
+            cost_by_day = self.getPairs(connection, """
+                SELECT created_at, SUM(cost)
+                FROM cars GROUP BY created_at ORDER BY created_at DESC LIMIT 14
+            """)
+            cost_by_day.reverse()
+
+            return {
+                "summary": dict(summary),
+                "cars_by_model": cars_by_model,
+                "odometer_by_model": odometer_by_model,
+                "cars_by_service": cars_by_service,
+                "cost_by_day": cost_by_day,
+            }
+        finally:
+            connection.close()
+
+    def getPairs(self, connection, sql):
+        """Run a 2-column query and return [[label, value], ...]."""
+        return [[row[0], row[1]] for row in connection.execute(sql).fetchall()]

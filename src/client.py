@@ -14,6 +14,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
+from stats_window import StatsWindow
+
 
 SERVER = "http://127.0.0.1:5050"
 
@@ -116,6 +118,7 @@ class WorkshopApp:
         ttk.Button(buttons, text="Delete", command=self.deleteCar).pack(side="left", padx=3)
         ttk.Button(buttons, text="Clear", command=self.clearForm).pack(side="left", padx=3)
         ttk.Button(buttons, text="Refresh", command=self.loadCars).pack(side="left", padx=3)
+        ttk.Button(buttons, text="Statistics", command=self.showStats).pack(side="right", padx=3)
 
     def buildTable(self):
         """The table (Treeview) that lists the saved cars."""
@@ -188,6 +191,14 @@ class WorkshopApp:
             return
         self.total_label.config(text=f"Total: {data['total']:.2f} SAR")
 
+
+    def showStats(self):
+        """Extra feature: GET /stats and open the Statistics window."""
+        data, error = sendRequest("/stats")
+        if error:
+            self.showError(error)
+            return
+        StatsWindow(self.root, data)
 
     def getFormValues(self):
         """Read the inputs into a dict (the server checks them)."""

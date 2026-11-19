@@ -171,5 +171,15 @@ def getTotal():
     return jsonify({"total": total})
 
 
+@app.route("/stats", methods=["GET"])
+def getStats():
+    """Extra feature: numbers and chart data for the Statistics window."""
+    try:
+        stats = db.getStats()
+    except sqlite3.Error:
+        return jsonify({"error": "Database error"}), 500
+    return jsonify(stats)
+
+
 if __name__ == "__main__":
     app.run(port=5050)
