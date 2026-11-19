@@ -7,18 +7,26 @@ on a Tkinter Canvas, so no extra library is needed.
 """
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import font, ttk
 
 
-CHART_WIDTH = 620
-CHART_HEIGHT = 300
+MAX_BARS = 14          # the longest list (cost per day, last 14 days)
+ROW_HEIGHT = 26        # pixels for one bar and its label
+BAR_HEIGHT = 18
+PADDING = 10
+MAX_LABEL_WIDTH = 200  # longer labels are cut with "…"
+CHART_WIDTH = 640
+CHART_HEIGHT = MAX_BARS * ROW_HEIGHT + 2 * PADDING
 BAR_COLOR = "#3f7cbf"
+TEXT_FONT = None       # set when the first window opens (Tk must exist first)
 
 
 class StatsWindow:
     """A window with one tab for the summary and one tab per chart."""
 
     def __init__(self, parent, stats):
+        global TEXT_FONT
+        TEXT_FONT = font.nametofont("TkDefaultFont")  # used to measure label widths
         self.window = tk.Toplevel(parent)
         self.window.title("Statistics")
 
@@ -26,19 +34,17 @@ class StatsWindow:
         tabs.pack(fill="both", expand=True)
 
         tabs.add(self.buildSummary(tabs, stats["summary"]), text="Summary")
-        # Models are saved in lowercase, so show them as "Toyota".
-        # Days are saved as "2026-11-20", so show only "11-20" to save space.
         tabs.add(self.buildChart(tabs, "Number of cars per model",
-                                 stats["cars_by_model"], "{:.0f}", str.title),
+                                 stats["cars_by_model"], "{:.0f}"),
                  text="Cars per model")
         tabs.add(self.buildChart(tabs, "Average odometer per model (km)",
-                                 stats["odometer_by_model"], "{:,.0f}", str.title),
+                                 stats["odometer_by_model"], "{:,.0f}"),
                  text="Odometer per model")
         tabs.add(self.buildChart(tabs, "Number of cars per service",
                                  stats["cars_by_service"], "{:.0f}"),
                  text="Services")
         tabs.add(self.buildChart(tabs, "Total cost per day, last 14 days (SAR)",
-                                 stats["cost_by_day"], "{:,.0f}", lambda day: day[5:]),
+                                 stats["cost_by_day"], "{:,.0f}"),
                  text="Cost over time")
 
     def buildSummary(self, parent, summary):
@@ -63,11 +69,10 @@ class StatsWindow:
                                           sticky="w", pady=(12, 0))
         return frame
 
-    def buildChart(self, parent, title, pairs, value_format, make_label=str):
+    def buildChart(self, parent, title, pairs, value_format):
         """A frame with a title and a bar chart of [[label, value], ...].
 
-        value_format is the text shown above each bar, like "{:,.0f}".
-        make_label changes how each label is shown (by default it is kept as it is).
+        value_format is the text shown after each bar, like "{:,.0f}".
         """
         frame = ttk.Frame(parent, padding=10)
         ttk.Label(frame, text=title, font=("TkDefaultFont", 11, "bold")).pack(anchor="w")
@@ -76,38 +81,52 @@ class StatsWindow:
                            background="white", highlightthickness=0)
         canvas.pack(pady=5)
 
-        labels = [make_label(str(label)) for label, _ in pairs]
+        labels = [str(label) for label, _ in pairs]
         values = [value for _, value in pairs]
         drawBarChart(canvas, labels, values, value_format)
         return frame
 
 
+def fitText(text, max_width):
+    """Cut text with "…" so it is not wider than max_width pixels."""
+    if TEXT_FONT.measure(text) <= max_width:
+        return text
+    while len(text) > 1 and TEXT_FONT.measure(text + "…") > max_width:
+        text = text[:-1]
+    return text + "…"
+
+
 def drawBarChart(canvas, labels, values, value_format):
-    """Draw one bar per value, with the value above and the label below it."""
+    """Draw one horizontal bar per value: label on the left, value after the bar.
+
+    Horizontal bars give every label a full line, so long names never overlap.
+    """
     if len(values) == 0:
         canvas.create_text(CHART_WIDTH / 2, CHART_HEIGHT / 2,
                            text="No data yet", fill="gray")
         return
 
-    # Room around the bars for the numbers (top) and the labels (bottom)
-    top, bottom, side = 30, 40, 20
-    chart_height = CHART_HEIGHT - top - bottom
-    slot_width = (CHART_WIDTH - 2 * side) / len(values)
-    bar_width = slot_width * 0.6
-    biggest = max(values) or 1  # "or 1" avoids dividing by 0 when all values are 0
+    value_texts = [value_format.format(value) for value in values]
 
-    # Base line
-    canvas.create_line(side, top + chart_height, CHART_WIDTH - side, top + chart_height)
+    # Width of the label column = the longest label (but not more than MAX_LABEL_WIDTH)
+    label_width = min(MAX_LABEL_WIDTH, max(TEXT_FONT.measure(label) for label in labels))
+    # Room after the longest bar for its number
+    value_width = max(TEXT_FONT.measure(text) for text in value_texts) + 10
 
-    for index, (label, value) in enumerate(zip(labels, values)):
-        middle = side + slot_width * index + slot_width / 2
-        bar_top = top + chart_height - (value / biggest) * chart_height
+    left = PADDING + label_width + 10            # where the bars start
+    longest_bar = CHART_WIDTH - left - value_width - PADDING
+    biggest = max(values) or 1                   # "or 1" avoids dividing by 0
 
-        canvas.create_rectangle(middle - bar_width / 2, bar_top,
-                                middle + bar_width / 2, top + chart_height,
-                                fill=BAR_COLOR, outline="")
-        canvas.create_text(middle, bar_top - 10, text=value_format.format(value))
-        # Long labels are cut so they do not overlap the next bar (about 7 px per letter)
-        max_letters = max(3, int(slot_width // 7))
-        short_label = label if len(label) <= max_letters else label[:max_letters - 1] + "…"
-        canvas.create_text(middle, top + chart_height + 15, text=short_label)
+    for index, (label, value, value_text) in enumerate(zip(labels, values, value_texts)):
+        middle = PADDING + ROW_HEIGHT * index + ROW_HEIGHT / 2
+        bar_end = left + (value / biggest) * longest_bar
+
+        canvas.create_text(left - 10, middle, text=fitText(label, label_width),
+                           anchor="e", font=TEXT_FONT)
+        canvas.create_rectangle(left, middle - BAR_HEIGHT / 2, bar_end,
+                                middle + BAR_HEIGHT / 2, fill=BAR_COLOR, outline="")
+        canvas.create_text(bar_end + 5, middle, text=value_text,
+                           anchor="w", font=TEXT_FONT)
+
+    # Line where the bars start
+    canvas.create_line(left, PADDING, left, PADDING + ROW_HEIGHT * len(values))

@@ -169,15 +169,18 @@ class CarDB:
                 FROM cars
             """).fetchone()
 
-            # The model is the car name; LOWER(TRIM()) makes "Toyota " and "toyota" one model
+            # The model is the car name. Grouping by LOWER(TRIM()) makes "Toyota " and
+            # "toyota" one model; MIN(TRIM(car_name)) shows the capitalised spelling
+            # (capital letters sort first), so "GMC Yukon" stays "GMC Yukon".
             cars_by_model = self.getPairs(connection, """
-                SELECT LOWER(TRIM(car_name)) AS model, COUNT(*)
-                FROM cars GROUP BY model ORDER BY COUNT(*) DESC, model LIMIT 10
+                SELECT MIN(TRIM(car_name)), COUNT(*)
+                FROM cars GROUP BY LOWER(TRIM(car_name))
+                ORDER BY COUNT(*) DESC, LOWER(TRIM(car_name)) LIMIT 10
             """)
             odometer_by_model = self.getPairs(connection, """
-                SELECT LOWER(TRIM(car_name)) AS model, AVG(odometer)
-                FROM cars WHERE odometer > 0
-                GROUP BY model ORDER BY AVG(odometer) DESC, model LIMIT 10
+                SELECT MIN(TRIM(car_name)), AVG(odometer)
+                FROM cars WHERE odometer > 0 GROUP BY LOWER(TRIM(car_name))
+                ORDER BY AVG(odometer) DESC, LOWER(TRIM(car_name)) LIMIT 10
             """)
             cars_by_service = self.getPairs(connection, """
                 SELECT service, COUNT(*)

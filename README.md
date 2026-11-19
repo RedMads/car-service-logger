@@ -66,7 +66,8 @@ Click **Statistics** (right side of the buttons). The window has five tabs:
 
 Each car gets a `created_at` date (the day it was added) for the cost-over-time chart.
 Editing a car keeps its date. Cars with 0 km are left out of the odometer averages.
-The charts are drawn on a Tkinter `Canvas`, so no extra library is needed.
+The charts are horizontal bar charts drawn on a Tkinter `Canvas` (no extra library needed):
+each label gets its own line on the left, so long model names never overlap.
 The database file is `src/cars.db`.
 
 ## Run
@@ -147,6 +148,7 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | **Statistics** → summary + 4 charts (cars per model, odometer per model, services, cost per day) | Pass |
 | Statistics with an empty database → zeros and "No data yet" in every chart | Pass |
 | ` Toyota` and `toyota` → one model "Toyota" in the charts | Pass |
+| 70 cars, 10 models / 10 services / 14 days → every chart label readable, no overlap; very long names cut with "…" | Pass |
 | Old `cars.db` without `created_at` → column added, old cars dated today | Pass |
 | `python src/report.py` → `report.txt` with correct cars and total | Pass |
 | `report.py` with Flask stopped → clear connection error | Pass |
