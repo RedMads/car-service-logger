@@ -6,6 +6,7 @@ Flask checks the values, uses CarDB (SQLite) and replies with JSON.
 Run it first:  python src/server.py
 """
 
+import re
 import sqlite3
 
 from flask import Flask, jsonify, request
@@ -22,9 +23,14 @@ SERVICES = ["Oil change", "Brakes", "Tires", "AC", "Engine", "Other"]
 STATUSES = ["Waiting", "Done"]
 MAX_COST = 100000
 
+# Saudi plate: 1 to 4 numbers, a space, then 3 English letters, like "1234 ABC".
+# The space is optional when typing; the server always saves it with one space.
+PLATE_PATTERN = re.compile(r"^([1-9][0-9]{0,3}) ?([A-Z]{3})$")
+
 # Friendly names used in error messages
 FIELD_LABELS = {
     "car_name": "Car name",
+    "plate": "Plate",
     "owner": "Owner",
     "service": "Service",
     "cost": "Cost",
@@ -41,6 +47,7 @@ def checkCarForm(form):
     # 1. Read every field and remove extra spaces
     data = {
         "car_name": form.get("car_name", "").strip(),
+        "plate": form.get("plate", "").strip().upper(),
         "owner": form.get("owner", "").strip(),
         "service": form.get("service", "").strip(),
         "cost": form.get("cost", "").strip(),
@@ -60,7 +67,13 @@ def checkCarForm(form):
     if data["cost"] < 0 or data["cost"] > MAX_COST:
         return None, f"Cost must be between 0 and {MAX_COST}"
 
-    # 4. Service and status must be one of the allowed choices
+    # 4. Plate must look like "1234 ABC" (saved in this exact form)
+    match = PLATE_PATTERN.match(data["plate"])
+    if match is None:
+        return None, "Plate must be 1-4 numbers then 3 letters, like 1234 ABC"
+    data["plate"] = f"{match.group(1)} {match.group(2)}"
+
+    # 5. Service and status must be one of the allowed choices
     if data["service"] not in SERVICES:
         return None, "Unknown service"
     if data["status"] not in STATUSES:
@@ -98,8 +111,8 @@ def addCar():
     if error:
         return jsonify({"error": error}), 400
     try:
-        db.add(data["car_name"], data["owner"], data["service"],
-               data["cost"], data["status"])
+        db.add(data["car_name"], data["plate"], data["owner"],
+               data["service"], data["cost"], data["status"])
     except sqlite3.Error:
         return jsonify({"error": "Database error"}), 500
     return jsonify({"message": "Car added"}), 201
@@ -112,7 +125,7 @@ def editCar(car_id):
     if error:
         return jsonify({"error": error}), 400
     try:
-        found = db.edit(car_id, data["car_name"], data["owner"],
+        found = db.edit(car_id, data["car_name"], data["plate"], data["owner"],
                         data["service"], data["cost"], data["status"])
     except sqlite3.Error:
         return jsonify({"error": "Database error"}), 500
