@@ -36,6 +36,7 @@ class CarDB:
                     id       INTEGER PRIMARY KEY AUTOINCREMENT,
                     car_name TEXT NOT NULL,
                     plate    TEXT NOT NULL DEFAULT '',
+                    mileage  INTEGER NOT NULL DEFAULT 0,
                     owner    TEXT NOT NULL,
                     service  TEXT NOT NULL,
                     cost     REAL NOT NULL,
@@ -43,13 +44,17 @@ class CarDB:
                 )
             """)
 
-            # Older databases were made before the plate column existed,
-            # so add it to them (old cars get an empty plate)
+            # Older databases were made before the plate and mileage columns
+            # existed, so add them (old cars get an empty plate and 0 km)
             columns = [row["name"] for row in
                        connection.execute("PRAGMA table_info(cars)").fetchall()]
             if "plate" not in columns:
                 connection.execute(
                     "ALTER TABLE cars ADD COLUMN plate TEXT NOT NULL DEFAULT ''"
+                )
+            if "mileage" not in columns:
+                connection.execute(
+                    "ALTER TABLE cars ADD COLUMN mileage INTEGER NOT NULL DEFAULT 0"
                 )
             connection.commit()
         finally:
@@ -76,27 +81,27 @@ class CarDB:
         finally:
             connection.close()
 
-    def add(self, car_name, plate, owner, service, cost, status):
+    def add(self, car_name, plate, mileage, owner, service, cost, status):
         """Insert a new car record."""
         connection = self.connect()
         try:
             connection.execute(
-                "INSERT INTO cars (car_name, plate, owner, service, cost, status) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (car_name, plate, owner, service, cost, status),
+                "INSERT INTO cars (car_name, plate, mileage, owner, service, cost, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (car_name, plate, mileage, owner, service, cost, status),
             )
             connection.commit()
         finally:
             connection.close()
 
-    def edit(self, car_id, car_name, plate, owner, service, cost, status):
+    def edit(self, car_id, car_name, plate, mileage, owner, service, cost, status):
         """Change one car. Return True if found, False if the ID is unknown."""
         connection = self.connect()
         try:
             cursor = connection.execute(
-                "UPDATE cars SET car_name = ?, plate = ?, owner = ?, service = ?, "
-                "cost = ?, status = ? WHERE id = ?",
-                (car_name, plate, owner, service, cost, status, car_id),
+                "UPDATE cars SET car_name = ?, plate = ?, mileage = ?, owner = ?, "
+                "service = ?, cost = ?, status = ? WHERE id = ?",
+                (car_name, plate, mileage, owner, service, cost, status, car_id),
             )
             connection.commit()
             # rowcount is 0 when no row had this ID

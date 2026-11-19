@@ -1,7 +1,7 @@
 # Car Workshop Service Log
 
 A small desktop app for a car workshop. The employee records each car that comes in
-(car, license plate, owner, service, cost in SAR, status `Waiting` / `Done`) and can add, view, edit
+(car, license plate, mileage, owner, service, cost in SAR, status `Waiting` / `Done`) and can add, view, edit
 and delete records. The extra feature is a **Total cost** label that sums all services.
 It helps small workshops that still write cars on paper.
 
@@ -36,10 +36,14 @@ pip install -r requirements.txt
 
 Nothing to do by hand. When `server.py` starts it calls `CarDB.createTable()`, which runs
 `CREATE TABLE IF NOT EXISTS`. The table is created only if it is missing, so old records are kept.
-If an older `cars.db` has no `plate` column, `createTable()` adds it (old cars get an empty plate).
+If an older `cars.db` has no `plate` or `mileage` column, `createTable()` adds it
+(old cars get an empty plate and 0 km).
 
 The license plate uses the Saudi format: 1-4 numbers, a space, then 3 English letters,
 for example `1234 ABC`. Lowercase or no space (`1234abc`) is accepted and saved as `1234 ABC`.
+
+Mileage is a whole number of km from 0 to 2,000,000. Commas are allowed when typing
+(`120,000`), and the table shows it with commas.
 
 Choosing **Other** in the Service list opens a small popup where the service is typed
 (for example `Windshield repair`). Cancel keeps the service chosen before. Typed services
@@ -91,7 +95,7 @@ python src/report.py      # terminal 3 - writes src/report.txt
    it to `http://127.0.0.1:5050/cars/add` using `urlopen(..., timeout=5)`.
 3. Flask's `addCar()` reads `request.form` and calls `checkCarForm()`. Bad values give JSON
    `{"error": ...}` with status 400.
-4. Good values go to `CarDB.add()`, which runs `INSERT ... VALUES (?, ?, ?, ?, ?, ?)`, commits and closes.
+4. Good values go to `CarDB.add()`, which runs `INSERT ... VALUES (?, ?, ?, ?, ?, ?, ?)`, commits and closes.
 5. Flask replies `{"message": "Car added"}` (201). The window shows the message and reloads the table and total.
 
 ## Test results
@@ -109,6 +113,8 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | Service **Other** → popup; typed `Windshield repair` is saved and shown in the table | Pass |
 | Service **Other** → Cancel or empty text → service goes back to the previous choice | Pass |
 | Typed service longer than 40 characters → "Service must be 40 characters or less" | Pass |
+| Mileage empty / `abc` / `12.5` / `-1` / `2000001` → clear error each time | Pass |
+| Mileage `120,000` → saved as 120000, shown as `120,000`; edit keeps the other fields | Pass |
 | Old `cars.db` without a plate column → column added on start, old cars keep their data | Pass |
 | Cost `-5` → "Cost must be between 0 and 100000" | Pass |
 | Empty database → table shows "No cars yet", total 0.00 | Pass |

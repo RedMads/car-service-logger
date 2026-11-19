@@ -102,6 +102,10 @@ class WorkshopApp:
         self.status_box.grid(row=2, column=3, padx=5, pady=3)
         self.status_box.set(STATUSES[0])
 
+        ttk.Label(form, text="Mileage (km):").grid(row=3, column=0, sticky="w")
+        self.mileage_entry = ttk.Entry(form, width=25)
+        self.mileage_entry.grid(row=3, column=1, padx=5, pady=3)
+
     def buildButtons(self):
         """One row of action buttons."""
         buttons = ttk.Frame(self.root, padding=(10, 0))
@@ -115,8 +119,9 @@ class WorkshopApp:
 
     def buildTable(self):
         """The table (Treeview) that lists the saved cars."""
-        columns = ("id", "car_name", "plate", "owner", "service", "cost", "status")
-        headings = ("ID", "Car", "Plate", "Owner", "Service", "Cost (SAR)", "Status")
+        columns = ("id", "car_name", "plate", "mileage", "owner", "service", "cost", "status")
+        headings = ("ID", "Car", "Plate", "Mileage (km)", "Owner", "Service",
+                    "Cost (SAR)", "Status")
 
         self.table = ttk.Treeview(self.root, columns=columns, show="headings", height=10)
         for column, heading in zip(columns, headings):
@@ -164,10 +169,11 @@ class WorkshopApp:
         self.table.delete(*self.table.get_children())
         if len(data["cars"]) == 0:
             # Show a note inside the table (keeps the last message visible)
-            self.table.insert("", "end", values=("", "No cars yet", "", "", "", "", ""))
+            self.table.insert("", "end", values=("", "No cars yet", "", "", "", "", "", ""))
         for car in data["cars"]:
             self.table.insert("", "end", values=(
-                car["id"], car["car_name"], car["plate"], car["owner"],
+                car["id"], car["car_name"], car["plate"], f"{car['mileage']:,}",
+                car["owner"],
                 car["service"], f"{car['cost']:.2f}", car["status"],
             ))
 
@@ -188,6 +194,7 @@ class WorkshopApp:
         return {
             "car_name": self.car_name_entry.get(),
             "plate": self.plate_entry.get(),
+            "mileage": self.mileage_entry.get(),
             "owner": self.owner_entry.get(),
             "service": self.service_box.get(),
             "cost": self.cost_entry.get(),
@@ -251,13 +258,15 @@ class WorkshopApp:
         self.car_name_entry.insert(0, row_values[1])
         self.plate_entry.delete(0, "end")
         self.plate_entry.insert(0, row_values[2])
+        self.mileage_entry.delete(0, "end")
+        self.mileage_entry.insert(0, row_values[3])
         self.owner_entry.delete(0, "end")
-        self.owner_entry.insert(0, row_values[3])
-        self.service_box.set(row_values[4])
-        self.last_service = str(row_values[4])
+        self.owner_entry.insert(0, row_values[4])
+        self.service_box.set(row_values[5])
+        self.last_service = str(row_values[5])
         self.cost_entry.delete(0, "end")
-        self.cost_entry.insert(0, row_values[5])
-        self.status_box.set(row_values[6])
+        self.cost_entry.insert(0, row_values[6])
+        self.status_box.set(row_values[7])
 
     def onServiceSelect(self, event):
         """If the user picks "Other", open a popup to type the service name."""
@@ -279,6 +288,7 @@ class WorkshopApp:
         self.selected_id = None
         self.car_name_entry.delete(0, "end")
         self.plate_entry.delete(0, "end")
+        self.mileage_entry.delete(0, "end")
         self.owner_entry.delete(0, "end")
         self.cost_entry.delete(0, "end")
         self.service_box.set(SERVICES[0])

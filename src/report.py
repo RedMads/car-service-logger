@@ -52,7 +52,7 @@ def writeReport(cars, file_name, result):
                 total = 0
                 for number, car in enumerate(cars, start=1):
                     report_file.write(
-                        f"{number}. {car['car_name']} | {car['plate'] or '-'} | {car['owner']} | "
+                        f"{number}. {car['car_name']} | {car['plate'] or '-'} | {car['mileage']:,} km | {car['owner']} | "
                         f"{car['service']} | {car['cost']:.2f} SAR | {car['status']}\n"
                     )
                     total += car["cost"]
