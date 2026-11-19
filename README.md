@@ -3,7 +3,8 @@
 A small desktop app for a car workshop. The employee records each car that comes in
 (car, license plate, odometer, owner, service, cost in SAR, status `Waiting` / `Done`) and can add, view, edit
 and delete records. The extra features are a **Total** label that sums the cost of all services, and a
-**Statistics** button that opens a window with a summary and bar charts.
+**Statistics** button that opens a window with a summary and bar charts, and a **Filter**
+button to show only some cars (by model, service and status).
 It helps small workshops that still write cars on paper.
 
 ```
@@ -20,6 +21,7 @@ Final_project/
 │   ├── server.py     # Flask routes + input checks (port 5050)
 │   ├── client.py     # Tkinter window + HTTP requests
 │   ├── stats_window.py # Statistics window with bar charts
+│   ├── filter_window.py # Filter popup (model, service, status)
 │   └── report.py     # thread that writes report.txt
 ├── requirements.txt  # flask
 ├── README.md
@@ -52,6 +54,14 @@ Choosing **Other** in the Service list opens a small popup where the service is 
 (for example `Windshield repair`). Cancel keeps the service chosen before. Typed services
 can be up to 40 characters.
 
+### Filter
+
+Click **Filter** (next to Statistics). Pick a **Car model**, a **Service** and a **Status**;
+"All" means no filter for that list. **Apply** shows only the matching cars, and a blue line
+under the total says which filter is on, how many cars match and their cost.
+**Show all** removes the filter. The lists only offer models and services that are saved.
+The filter stays on while you add, edit or delete cars.
+
 ### Statistics window
 
 Click **Statistics** (right side of the buttons). The window has five tabs:
@@ -83,6 +93,7 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | Method | Route                       | What it does                    | Replies          |
 |--------|-----------------------------|---------------------------------|------------------|
 | GET    | `/cars`                     | all cars (JSON route for report) | 200              |
+| GET    | `/cars?model=&service=&status=` | extra feature: filtered cars | 200              |
 | GET    | `/cars/<car_id>`            | one car                         | 200 / 404        |
 | POST   | `/cars/add`                 | add a car                       | 201 / 400        |
 | POST   | `/cars/<car_id>/edit`       | edit a car                      | 200 / 400 / 404  |
@@ -106,6 +117,7 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | SQLite | `src/database.py` `CarDB` methods (`?` placeholders, one connection per call, commit, close) |
 | Threads & files | `src/report.py` `main()` (`Thread`, `start()`, `join()`) + `writeReport()` (`with open(..., encoding="utf-8")`) |
 | Charts (Tkinter Canvas) | `src/stats_window.py` `StatsWindow` (Notebook tabs) + `drawBarChart()` |
+| SQL filter | `src/database.py` `CarDB.getAll()` (builds `WHERE ... AND ...` with `?` placeholders) |
 | SQL aggregates | `src/database.py` `CarDB.getStats()` (`COUNT`, `SUM`, `AVG`, `GROUP BY`) |
 | Tkinter | `src/client.py` `WorkshopApp` (labels, entries, comboboxes, buttons, Treeview, messagebox, simpledialog in `onServiceSelect()`) |
 | Client & server | `src/client.py` `WorkshopApp.addCar()` → `sendRequest("/cars/add", values)` → `src/server.py` `addCar()` → `CarDB.add()` → JSON `{"message": "Car added"}` |
@@ -150,6 +162,10 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | ` Toyota` and `toyota` → one model "Toyota" in the charts | Pass |
 | 70 cars, 10 models / 10 services / 14 days → every chart label readable, no overlap; very long names cut with "…" | Pass |
 | Old `cars.db` without `created_at` → column added, old cars dated today | Pass |
+| **Filter** → Toyota Camry + Done → only those cars; blue line shows "5 cars, 3,075.00 SAR" | Pass |
+| Filter keeps working after Add / Update; reopening the popup shows the current filter | Pass |
+| Filter with no matching cars → table shows "No cars match the filter" | Pass |
+| Filter → **Show all** → all 70 cars again, blue line disappears | Pass |
 | `python src/report.py` → `report.txt` with correct cars and total | Pass |
 | `report.py` with Flask stopped → clear connection error | Pass |
 

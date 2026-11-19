@@ -76,11 +76,32 @@ class CarDB:
             # Always close the connection, even if an error happened
             connection.close()
 
-    def getAll(self):
-        """Return every car as a list of dicts (empty list if none)."""
+    def getAll(self, model="", service="", status=""):
+        """Return the cars as a list of dicts (empty list if none).
+
+        Extra feature: model, service and status filter the list.
+        An empty value means "all". Model ignores upper/lower case and extra spaces.
+        """
+        conditions = []
+        values = []
+        if model:
+            conditions.append("LOWER(TRIM(car_name)) = LOWER(TRIM(?))")
+            values.append(model)
+        if service:
+            conditions.append("service = ?")
+            values.append(service)
+        if status:
+            conditions.append("status = ?")
+            values.append(status)
+
+        sql = "SELECT * FROM cars"
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        sql += " ORDER BY id"
+
         connection = self.connect()
         try:
-            rows = connection.execute("SELECT * FROM cars ORDER BY id").fetchall()
+            rows = connection.execute(sql, values).fetchall()
             return [dict(row) for row in rows]
         finally:
             connection.close()
