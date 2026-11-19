@@ -102,9 +102,9 @@ class WorkshopApp:
         self.status_box.grid(row=2, column=3, padx=5, pady=3)
         self.status_box.set(STATUSES[0])
 
-        ttk.Label(form, text="Mileage (km):").grid(row=3, column=0, sticky="w")
-        self.mileage_entry = ttk.Entry(form, width=25)
-        self.mileage_entry.grid(row=3, column=1, padx=5, pady=3)
+        ttk.Label(form, text="Odometer (km):").grid(row=3, column=0, sticky="w")
+        self.odometer_entry = ttk.Entry(form, width=25)
+        self.odometer_entry.grid(row=3, column=1, padx=5, pady=3)
 
     def buildButtons(self):
         """One row of action buttons."""
@@ -119,8 +119,8 @@ class WorkshopApp:
 
     def buildTable(self):
         """The table (Treeview) that lists the saved cars."""
-        columns = ("id", "car_name", "plate", "mileage", "owner", "service", "cost", "status")
-        headings = ("ID", "Car", "Plate", "Mileage (km)", "Owner", "Service",
+        columns = ("id", "car_name", "plate", "odometer", "owner", "service", "cost", "status")
+        headings = ("ID", "Car", "Plate", "Odometer (km)", "Owner", "Service",
                     "Cost (SAR)", "Status")
 
         self.table = ttk.Treeview(self.root, columns=columns, show="headings", height=10)
@@ -172,7 +172,7 @@ class WorkshopApp:
             self.table.insert("", "end", values=("", "No cars yet", "", "", "", "", "", ""))
         for car in data["cars"]:
             self.table.insert("", "end", values=(
-                car["id"], car["car_name"], car["plate"], f"{car['mileage']:,}",
+                car["id"], car["car_name"], car["plate"], f"{car['odometer']:,}",
                 car["owner"],
                 car["service"], f"{car['cost']:.2f}", car["status"],
             ))
@@ -194,7 +194,7 @@ class WorkshopApp:
         return {
             "car_name": self.car_name_entry.get(),
             "plate": self.plate_entry.get(),
-            "mileage": self.mileage_entry.get(),
+            "odometer": self.odometer_entry.get(),
             "owner": self.owner_entry.get(),
             "service": self.service_box.get(),
             "cost": self.cost_entry.get(),
@@ -258,8 +258,8 @@ class WorkshopApp:
         self.car_name_entry.insert(0, row_values[1])
         self.plate_entry.delete(0, "end")
         self.plate_entry.insert(0, row_values[2])
-        self.mileage_entry.delete(0, "end")
-        self.mileage_entry.insert(0, row_values[3])
+        self.odometer_entry.delete(0, "end")
+        self.odometer_entry.insert(0, row_values[3])
         self.owner_entry.delete(0, "end")
         self.owner_entry.insert(0, row_values[4])
         self.service_box.set(row_values[5])
@@ -288,7 +288,7 @@ class WorkshopApp:
         self.selected_id = None
         self.car_name_entry.delete(0, "end")
         self.plate_entry.delete(0, "end")
-        self.mileage_entry.delete(0, "end")
+        self.odometer_entry.delete(0, "end")
         self.owner_entry.delete(0, "end")
         self.cost_entry.delete(0, "end")
         self.service_box.set(SERVICES[0])

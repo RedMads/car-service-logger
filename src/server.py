@@ -23,7 +23,7 @@ db.createTable()  # create the table at start-up if it is missing
 STATUSES = ["Waiting", "Done"]
 MAX_SERVICE_LENGTH = 40
 MAX_COST = 100000
-MAX_MILEAGE = 2000000  # km
+MAX_ODOMETER = 2000000  # km
 
 # Saudi plate: 1 to 4 numbers, a space, then 3 English letters, like "1234 ABC".
 # The space is optional when typing; the server always saves it with one space.
@@ -33,7 +33,7 @@ PLATE_PATTERN = re.compile(r"^([1-9][0-9]{0,3}) ?([A-Z]{3})$")
 FIELD_LABELS = {
     "car_name": "Car name",
     "plate": "Plate",
-    "mileage": "Mileage",
+    "odometer": "Odometer",
     "owner": "Owner",
     "service": "Service",
     "cost": "Cost",
@@ -52,7 +52,7 @@ def checkCarForm(form):
         "car_name": form.get("car_name", "").strip(),
         "plate": form.get("plate", "").strip().upper(),
         # Commas are allowed when typing, like "120,000"
-        "mileage": form.get("mileage", "").strip().replace(",", ""),
+        "odometer": form.get("odometer", "").strip().replace(",", ""),
         "owner": form.get("owner", "").strip(),
         "service": form.get("service", "").strip(),
         "cost": form.get("cost", "").strip(),
@@ -78,13 +78,13 @@ def checkCarForm(form):
         return None, "Plate must be 1-4 numbers then 3 letters, like 1234 ABC"
     data["plate"] = f"{match.group(1)} {match.group(2)}"
 
-    # 5. Mileage must be a whole number of km between 0 and MAX_MILEAGE
+    # 5. Odometer must be a whole number of km between 0 and MAX_ODOMETER
     try:
-        data["mileage"] = int(data["mileage"])
+        data["odometer"] = int(data["odometer"])
     except ValueError:
-        return None, "Mileage must be a whole number (km)"
-    if data["mileage"] < 0 or data["mileage"] > MAX_MILEAGE:
-        return None, f"Mileage must be between 0 and {MAX_MILEAGE} km"
+        return None, "Odometer must be a whole number (km)"
+    if data["odometer"] < 0 or data["odometer"] > MAX_ODOMETER:
+        return None, f"Odometer must be between 0 and {MAX_ODOMETER} km"
 
     # 6. Service can be typed by the user, so only limit its length
     if len(data["service"]) > MAX_SERVICE_LENGTH:
@@ -126,7 +126,7 @@ def addCar():
     if error:
         return jsonify({"error": error}), 400
     try:
-        db.add(data["car_name"], data["plate"], data["mileage"], data["owner"],
+        db.add(data["car_name"], data["plate"], data["odometer"], data["owner"],
                data["service"], data["cost"], data["status"])
     except sqlite3.Error:
         return jsonify({"error": "Database error"}), 500
@@ -140,7 +140,7 @@ def editCar(car_id):
     if error:
         return jsonify({"error": error}), 400
     try:
-        found = db.edit(car_id, data["car_name"], data["plate"], data["mileage"],
+        found = db.edit(car_id, data["car_name"], data["plate"], data["odometer"],
                         data["owner"], data["service"], data["cost"], data["status"])
     except sqlite3.Error:
         return jsonify({"error": "Database error"}), 500
