@@ -99,14 +99,9 @@ def checkCarForm(form):
 
 @app.route("/cars", methods=["GET"])
 def listCars():
-    """JSON route: return the saved cars (used by the window and report.py).
-
-    Extra feature: optional filters in the URL, like /cars?model=Camry&status=Done
-    """
+    """JSON route: return all saved cars (used by the window and report.py)."""
     try:
-        cars = db.getAll(request.args.get("model", "").strip(),
-                         request.args.get("service", "").strip(),
-                         request.args.get("status", "").strip())
+        cars = db.getAll()
     except sqlite3.Error:
         return jsonify({"error": "Database error"}), 500
     return jsonify({"cars": cars})

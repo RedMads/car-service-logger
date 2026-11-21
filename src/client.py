@@ -14,7 +14,6 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
-from filter_window import FilterWindow
 from stats_window import StatsWindow
 
 
@@ -68,8 +67,6 @@ class WorkshopApp:
 
         # ID of the row the user clicked (None = nothing selected)
         self.selected_id = None
-        # Extra feature: the filter in use ("" = all)
-        self.filters = {"model": "", "service": "", "status": ""}
 
         self.buildForm()
         self.buildButtons()
@@ -128,7 +125,6 @@ class WorkshopApp:
         ttk.Button(buttons, text="Clear", command=self.clearForm).pack(side="left", padx=3)
         ttk.Button(buttons, text="Refresh", command=self.loadCars).pack(side="left", padx=3)
         ttk.Button(buttons, text="Statistics", command=self.showStats).pack(side="right", padx=3)
-        ttk.Button(buttons, text="Filter", command=self.openFilter).pack(side="right", padx=3)
 
     def buildTable(self):
         """The table (Treeview) that lists the saved cars."""
@@ -151,11 +147,6 @@ class WorkshopApp:
         self.total_label = ttk.Label(self.root, text="Total: 0.00 SAR",
                                      font=("TkDefaultFont", 11, "bold"), padding=(10, 0))
         self.total_label.pack(fill="x")
-
-        # Extra feature: says which filter is on (empty when the table shows all cars)
-        self.filter_label = ttk.Label(self.root, text="", foreground="#1f5fa0",
-                                      padding=(10, 4, 10, 0))
-        self.filter_label.pack(fill="x")
 
         self.message_label = ttk.Label(self.root, text="", padding=10)
         self.message_label.pack(fill="x")
@@ -184,14 +175,8 @@ class WorkshopApp:
         return True
 
     def loadCars(self):
-        """GET /cars (with the filter, if any) and fill the table."""
-        # Only send the filters that are set, like /cars?model=Camry&status=Done
-        used_filters = {name: value for name, value in self.filters.items() if value}
-        path = "/cars"
-        if used_filters:
-            path += "?" + urlencode(used_filters)
-
-        data, error = sendRequest(path)
+        """GET /cars and fill the table."""
+        data, error = sendRequest("/cars")
         if error:
             self.showError(error)
             return
@@ -200,52 +185,15 @@ class WorkshopApp:
         self.table.delete(*self.table.get_children())
         if len(data["cars"]) == 0:
             # Show a note inside the table (keeps the last message visible)
-            note = "No cars match the filter" if used_filters else "No cars yet"
-            self.table.insert("", "end", values=("", note))
+            self.table.insert("", "end", values=("", "No cars yet"))
         for car in data["cars"]:
             self.table.insert("", "end", values=(
                 car["id"], car["car_name"], car["plate"], f"{car['odometer']:,}",
                 car["owner"], car["service"], f"{car['cost']:.2f}", car["status"],
             ))
 
-        self.showFilter(used_filters, data["cars"])
-
         # The total changes whenever the list changes
         self.loadTotal()
-
-    def showFilter(self, used_filters, cars):
-        """Extra feature: show the filter in use, with its number of cars and cost."""
-        if not used_filters:
-            self.filter_label.config(text="")
-            return
-        cost = sum(car["cost"] for car in cars)
-        self.filter_label.config(
-            text=f"Filter: {' · '.join(used_filters.values())}  →  "
-                 f"{len(cars)} cars, {cost:,.2f} SAR   (Filter → Show all to remove)")
-
-    def openFilter(self):
-        """Extra feature: open the Filter popup with the models and services in use."""
-        data, error = sendRequest("/cars")  # all cars, to build the choice lists
-        if error:
-            self.showError(error)
-            return
-
-        # One entry per model: "Toyota Camry" and "toyota camry " are the same model
-        models = {}
-        for car in data["cars"]:
-            key = car["car_name"].strip().lower()
-            models[key] = min(models.get(key, car["car_name"].strip()), car["car_name"].strip())
-        model_list = sorted(models.values(), key=str.lower)
-        service_list = sorted({car["service"] for car in data["cars"]}, key=str.lower)
-
-        FilterWindow(self.root, model_list, service_list, STATUSES,
-                     self.filters, self.applyFilter)
-
-    def applyFilter(self, filters):
-        """Called by the Filter popup: keep the new filter and reload the table."""
-        self.filters = filters
-        self.clearForm()
-        self.loadCars()
 
     def loadTotal(self):
         """Extra feature: GET /total and show it under the table."""
