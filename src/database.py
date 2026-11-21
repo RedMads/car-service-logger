@@ -81,7 +81,10 @@ class CarDB:
         connection = self.connect()
         try:
             rows = connection.execute("SELECT * FROM cars ORDER BY id").fetchall()
-            return [dict(row) for row in rows]
+            cars = []
+            for row in rows:
+                cars.append(dict(row))
+            return cars
         finally:
             connection.close()
 
@@ -92,7 +95,9 @@ class CarDB:
             row = connection.execute(
                 "SELECT * FROM cars WHERE id = ?", (car_id,)
             ).fetchone()
-            return dict(row) if row else None
+            if row is None:
+                return None
+            return dict(row)
         finally:
             connection.close()
 
@@ -141,7 +146,9 @@ class CarDB:
         try:
             row = connection.execute("SELECT SUM(cost) AS total FROM cars").fetchone()
             # SUM gives NULL (None) for an empty table, so use 0 instead
-            return row["total"] or 0
+            if row["total"] is None:
+                return 0
+            return row["total"]
         finally:
             connection.close()
 
@@ -205,4 +212,7 @@ class CarDB:
 
     def getPairs(self, connection, sql):
         """Run a 2-column query and return [[label, value], ...]."""
-        return [[row[0], row[1]] for row in connection.execute(sql).fetchall()]
+        pairs = []
+        for row in connection.execute(sql).fetchall():
+            pairs.append([row[0], row[1]])
+        return pairs

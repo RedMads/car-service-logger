@@ -81,8 +81,11 @@ class StatsWindow:
                            background="white", highlightthickness=0)
         canvas.pack(pady=5)
 
-        labels = [str(label) for label, _ in pairs]
-        values = [value for _, value in pairs]
+        labels = []
+        values = []
+        for label, value in pairs:
+            labels.append(str(label))
+            values.append(value)
         drawBarChart(canvas, labels, values, value_format)
         return frame
 
@@ -106,16 +109,27 @@ def drawBarChart(canvas, labels, values, value_format):
                            text="No data yet", fill="gray")
         return
 
-    value_texts = [value_format.format(value) for value in values]
+    value_texts = []
+    for value in values:
+        value_texts.append(value_format.format(value))
 
     # Width of the label column = the longest label (but not more than MAX_LABEL_WIDTH)
-    label_width = min(MAX_LABEL_WIDTH, max(TEXT_FONT.measure(label) for label in labels))
+    longest_label = 0
+    for label in labels:
+        longest_label = max(longest_label, TEXT_FONT.measure(label))
+    label_width = min(MAX_LABEL_WIDTH, longest_label)
+
     # Room after the longest bar for its number
-    value_width = max(TEXT_FONT.measure(text) for text in value_texts) + 10
+    longest_value = 0
+    for text in value_texts:
+        longest_value = max(longest_value, TEXT_FONT.measure(text))
+    value_width = longest_value + 10
 
     left = PADDING + label_width + 10            # where the bars start
     longest_bar = CHART_WIDTH - left - value_width - PADDING
-    biggest = max(values) or 1                   # "or 1" avoids dividing by 0
+    biggest = max(values)
+    if biggest == 0:
+        biggest = 1                              # avoids dividing by 0
 
     for index, (label, value, value_text) in enumerate(zip(labels, values, value_texts)):
         middle = PADDING + ROW_HEIGHT * index + ROW_HEIGHT / 2
