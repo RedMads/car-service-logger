@@ -6,6 +6,7 @@ Flask checks the values, uses CarDB (SQLite) and replies with JSON.
 Run it first:  python src/server.py
 """
 
+import math
 import re
 import sqlite3
 
@@ -42,11 +43,7 @@ FIELD_LABELS = {
 
 
 def checkCarForm(form):
-    """Check the form values sent by the window.
-
-    Returns (data, None) if everything is valid,
-    or (None, error_message) if something is wrong.
-    """
+    """Check and clean the form values; return (data, None) or (None, error)."""
     # 1. Read every field and remove extra spaces
     data = {
         "car_name": form.get("car_name", "").strip(),
@@ -69,7 +66,8 @@ def checkCarForm(form):
         data["cost"] = float(data["cost"])
     except ValueError:
         return None, "Cost must be a number"
-    if data["cost"] < 0 or data["cost"] > MAX_COST:
+    # NaN fails every comparison, so it must be checked on its own
+    if math.isnan(data["cost"]) or data["cost"] < 0 or data["cost"] > MAX_COST:
         return None, f"Cost must be between 0 and {MAX_COST}"
 
     # 4. Plate must look like "1234 ABC" (saved in this exact form)

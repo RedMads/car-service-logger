@@ -25,11 +25,7 @@ STATUSES = ["Waiting", "Done"]
 
 
 def sendRequest(path, values=None):
-    """Send one request to Flask.
-
-    GET if values is None, POST if values is a dict.
-    Returns (data, None) on success or (None, error_message) on failure.
-    """
+    """Send GET (no values) or POST (values dict) to Flask; return (data, error)."""
     url = SERVER + path
 
     # POST needs the values as bytes; GET sends no body
@@ -133,9 +129,9 @@ class WorkshopApp:
                     "Cost (SAR)", "Status")
 
         self.table = ttk.Treeview(self.root, columns=columns, show="headings", height=10)
-        for column, heading in zip(columns, headings):
-            self.table.heading(column, text=heading)
-            self.table.column(column, width=110)
+        for index in range(len(columns)):
+            self.table.heading(columns[index], text=headings[index])
+            self.table.column(columns[index], width=110)
         self.table.column("id", width=40)
         self.table.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -182,7 +178,8 @@ class WorkshopApp:
             return
 
         # Remove the old rows, then add one row per car
-        self.table.delete(*self.table.get_children())
+        for row in self.table.get_children():
+            self.table.delete(row)
         if len(data["cars"]) == 0:
             # Show a note inside the table (keeps the last message visible)
             self.table.insert("", "end", values=("", "No cars yet"))

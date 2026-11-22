@@ -48,12 +48,14 @@ class CarDB:
 
             # Older databases were made before the plate and odometer columns
             # existed, so add them (old cars get an empty plate and 0 km)
-            columns = [row["name"] for row in
-                       connection.execute("PRAGMA table_info(cars)").fetchall()]
+            columns = []
+            for row in connection.execute("PRAGMA table_info(cars)").fetchall():
+                columns.append(row["name"])
+
             if "mileage" in columns and "odometer" not in columns:
                 # The odometer column used to be called mileage: rename it, keep the values
                 connection.execute("ALTER TABLE cars RENAME COLUMN mileage TO odometer")
-                columns[columns.index("mileage")] = "odometer"
+                columns.append("odometer")
             if "plate" not in columns:
                 connection.execute(
                     "ALTER TABLE cars ADD COLUMN plate TEXT NOT NULL DEFAULT ''"
@@ -153,15 +155,7 @@ class CarDB:
             connection.close()
 
     def getStats(self):
-        """Extra feature: numbers and groups for the Statistics window.
-
-        Returns a dict:
-          summary          -> cars, waiting, done, total_cost, average_cost, average_odometer
-          cars_by_model    -> [[model, number of cars], ...]  (top 10)
-          odometer_by_model-> [[model, average km], ...]      (top 10)
-          cars_by_service  -> [[service, number of cars], ...]
-          cost_by_day      -> [[date, total cost], ...]        (last 14 days with cars)
-        """
+        """Extra feature: the summary numbers and chart data for the Statistics window."""
         connection = self.connect()
         try:
             # COALESCE turns NULL (empty table) into 0.
@@ -184,11 +178,13 @@ class CarDB:
                 FROM cars GROUP BY LOWER(TRIM(car_name))
                 ORDER BY COUNT(*) DESC, LOWER(TRIM(car_name)) LIMIT 10
             """)
+            # Average odometer per model (cars with 0 km are skipped)
             odometer_by_model = self.getPairs(connection, """
                 SELECT MIN(TRIM(car_name)), AVG(odometer)
                 FROM cars WHERE odometer > 0 GROUP BY LOWER(TRIM(car_name))
                 ORDER BY AVG(odometer) DESC, LOWER(TRIM(car_name)) LIMIT 10
             """)
+            # How many cars got each service
             cars_by_service = self.getPairs(connection, """
                 SELECT service, COUNT(*)
                 FROM cars GROUP BY service ORDER BY COUNT(*) DESC, service
