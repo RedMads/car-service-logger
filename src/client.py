@@ -9,10 +9,12 @@ Start the server first, then run:  python src/client.py
 import json
 import socket
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
+
+from stats_window import StatsWindow
 
 
 SERVER = "http://127.0.0.1:5050"
@@ -23,11 +25,7 @@ STATUSES = ["Waiting", "Done"]
 
 
 def sendRequest(path, values=None):
-    """Send one request to Flask.
-
-    GET if values is None, POST if values is a dict.
-    Returns (data, None) on success or (None, error_message) on failure.
-    """
+    """Send GET (no values) or POST (values dict) to Flask; return (data, error)."""
     url = SERVER + path
 
     # POST needs the values as bytes; GET sends no body
@@ -48,6 +46,12 @@ def sendRequest(path, values=None):
         return None, "Cannot connect to the server. Is Flask running?"
     except socket.timeout:
         return None, "The server took too long to reply."
+
+
+def setText(entry, text):
+    """Replace the text inside an input box."""
+    entry.delete(0, "end")
+    entry.insert(0, text)
 
 
 class WorkshopApp:
@@ -77,23 +81,34 @@ class WorkshopApp:
         self.car_name_entry = ttk.Entry(form, width=25)
         self.car_name_entry.grid(row=0, column=1, padx=5, pady=3)
 
-        ttk.Label(form, text="Owner:").grid(row=0, column=2, sticky="w")
+        ttk.Label(form, text="Plate (1234 ABC):").grid(row=0, column=2, sticky="w")
+        self.plate_entry = ttk.Entry(form, width=25)
+        self.plate_entry.grid(row=0, column=3, padx=5, pady=3)
+
+        ttk.Label(form, text="Owner:").grid(row=1, column=0, sticky="w")
         self.owner_entry = ttk.Entry(form, width=25)
-        self.owner_entry.grid(row=0, column=3, padx=5, pady=3)
+        self.owner_entry.grid(row=1, column=1, padx=5, pady=3)
 
-        ttk.Label(form, text="Service:").grid(row=1, column=0, sticky="w")
+        ttk.Label(form, text="Service:").grid(row=1, column=2, sticky="w")
         self.service_box = ttk.Combobox(form, values=SERVICES, state="readonly", width=22)
-        self.service_box.grid(row=1, column=1, padx=5, pady=3)
+        self.service_box.grid(row=1, column=3, padx=5, pady=3)
         self.service_box.set(SERVICES[0])
+        # Remember the last good service, so Cancel in the "Other" popup can go back to it
+        self.last_service = SERVICES[0]
+        self.service_box.bind("<<ComboboxSelected>>", self.onServiceSelect)
 
-        ttk.Label(form, text="Cost (SAR):").grid(row=1, column=2, sticky="w")
+        ttk.Label(form, text="Cost (SAR):").grid(row=2, column=0, sticky="w")
         self.cost_entry = ttk.Entry(form, width=25)
-        self.cost_entry.grid(row=1, column=3, padx=5, pady=3)
+        self.cost_entry.grid(row=2, column=1, padx=5, pady=3)
 
-        ttk.Label(form, text="Status:").grid(row=2, column=0, sticky="w")
+        ttk.Label(form, text="Status:").grid(row=2, column=2, sticky="w")
         self.status_box = ttk.Combobox(form, values=STATUSES, state="readonly", width=22)
-        self.status_box.grid(row=2, column=1, padx=5, pady=3)
+        self.status_box.grid(row=2, column=3, padx=5, pady=3)
         self.status_box.set(STATUSES[0])
+
+        ttk.Label(form, text="Odometer (km):").grid(row=3, column=0, sticky="w")
+        self.odometer_entry = ttk.Entry(form, width=25)
+        self.odometer_entry.grid(row=3, column=1, padx=5, pady=3)
 
     def buildButtons(self):
         """One row of action buttons."""
@@ -105,16 +120,18 @@ class WorkshopApp:
         ttk.Button(buttons, text="Delete", command=self.deleteCar).pack(side="left", padx=3)
         ttk.Button(buttons, text="Clear", command=self.clearForm).pack(side="left", padx=3)
         ttk.Button(buttons, text="Refresh", command=self.loadCars).pack(side="left", padx=3)
+        ttk.Button(buttons, text="Statistics", command=self.showStats).pack(side="right", padx=3)
 
     def buildTable(self):
         """The table (Treeview) that lists the saved cars."""
-        columns = ("id", "car_name", "owner", "service", "cost", "status")
-        headings = ("ID", "Car", "Owner", "Service", "Cost (SAR)", "Status")
+        columns = ("id", "car_name", "plate", "odometer", "owner", "service", "cost", "status")
+        headings = ("ID", "Car", "Plate", "Odometer (km)", "Owner", "Service",
+                    "Cost (SAR)", "Status")
 
         self.table = ttk.Treeview(self.root, columns=columns, show="headings", height=10)
-        for column, heading in zip(columns, headings):
-            self.table.heading(column, text=heading)
-            self.table.column(column, width=110)
+        for index in range(len(columns)):
+            self.table.heading(columns[index], text=headings[index])
+            self.table.column(columns[index], width=110)
         self.table.column("id", width=40)
         self.table.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -123,7 +140,7 @@ class WorkshopApp:
 
     def buildMessages(self):
         """Total cost label and a message label at the bottom."""
-        self.total_label = ttk.Label(self.root, text="Total cost: 0.00 SAR",
+        self.total_label = ttk.Label(self.root, text="Total: 0.00 SAR",
                                      font=("TkDefaultFont", 11, "bold"), padding=(10, 0))
         self.total_label.pack(fill="x")
 
@@ -138,6 +155,13 @@ class WorkshopApp:
         """Show an error at the bottom and in a popup box."""
         self.message_label.config(text=text, foreground="red")
         messagebox.showerror("Error", text)
+
+    def showRequestError(self, error):
+        """Show a server error. If the car was deleted meanwhile, reload the list."""
+        self.showError(error)
+        if error == "Car not found":
+            self.clearForm()
+            self.loadCars()
 
     def checkSelected(self):
         """Return True if a car is selected, otherwise show an error."""
@@ -154,14 +178,15 @@ class WorkshopApp:
             return
 
         # Remove the old rows, then add one row per car
-        self.table.delete(*self.table.get_children())
+        for row in self.table.get_children():
+            self.table.delete(row)
         if len(data["cars"]) == 0:
             # Show a note inside the table (keeps the last message visible)
-            self.table.insert("", "end", values=("", "No cars yet", "", "", "", ""))
+            self.table.insert("", "end", values=("", "No cars yet"))
         for car in data["cars"]:
             self.table.insert("", "end", values=(
-                car["id"], car["car_name"], car["owner"],
-                car["service"], f"{car['cost']:.2f}", car["status"],
+                car["id"], car["car_name"], car["plate"], f"{car['odometer']:,}",
+                car["owner"], car["service"], f"{car['cost']:.2f}", car["status"],
             ))
 
         # The total changes whenever the list changes
@@ -173,13 +198,22 @@ class WorkshopApp:
         if error:
             self.showError(error)
             return
-        self.total_label.config(text=f"Total cost: {data['total']:.2f} SAR")
+        self.total_label.config(text=f"Total: {data['total']:.2f} SAR")
 
+    def showStats(self):
+        """Extra feature: GET /stats and open the Statistics window."""
+        data, error = sendRequest("/stats")
+        if error:
+            self.showError(error)
+            return
+        StatsWindow(self.root, data)
 
     def getFormValues(self):
         """Read the inputs into a dict (the server checks them)."""
         return {
             "car_name": self.car_name_entry.get(),
+            "plate": self.plate_entry.get(),
+            "odometer": self.odometer_entry.get(),
             "owner": self.owner_entry.get(),
             "service": self.service_box.get(),
             "cost": self.cost_entry.get(),
@@ -202,10 +236,7 @@ class WorkshopApp:
             return
         data, error = sendRequest(f"/cars/{self.selected_id}/edit", self.getFormValues())
         if error:
-            self.showError(error)
-            if error == "Car not found":
-                self.clearForm()
-                self.loadCars()
+            self.showRequestError(error)
             return
         self.showMessage(data["message"])
         self.loadCars()
@@ -220,10 +251,7 @@ class WorkshopApp:
 
         data, error = sendRequest(f"/cars/{self.selected_id}/delete", {})
         if error:
-            self.showError(error)
-            if error == "Car not found":
-                self.clearForm()
-                self.loadCars()
+            self.showRequestError(error)
             return
         self.showMessage(data["message"])
         self.clearForm()
@@ -238,23 +266,41 @@ class WorkshopApp:
         if row_values[0] == "":
             return  # the "No cars yet" row is not a real car
 
-        self.selected_id = row_values[0]
-        self.car_name_entry.delete(0, "end")
-        self.car_name_entry.insert(0, row_values[1])
-        self.owner_entry.delete(0, "end")
-        self.owner_entry.insert(0, row_values[2])
-        self.service_box.set(row_values[3])
-        self.cost_entry.delete(0, "end")
-        self.cost_entry.insert(0, row_values[4])
-        self.status_box.set(row_values[5])
+        # Same order as the table columns
+        car_id, car_name, plate, odometer, owner, service, cost, status = row_values
+        self.selected_id = car_id
+        setText(self.car_name_entry, car_name)
+        setText(self.plate_entry, plate)
+        setText(self.odometer_entry, odometer)
+        setText(self.owner_entry, owner)
+        setText(self.cost_entry, cost)
+        self.service_box.set(service)
+        self.last_service = str(service)
+        self.status_box.set(status)
+
+    def onServiceSelect(self, event):
+        """If the user picks "Other", open a popup to type the service name."""
+        if self.service_box.get() != "Other":
+            self.last_service = self.service_box.get()
+            return
+
+        typed = simpledialog.askstring("Other service", "Type the service:",
+                                       parent=self.root)
+        if typed is None or typed.strip() == "":
+            # Cancel or empty: go back to the service chosen before
+            self.service_box.set(self.last_service)
+            return
+        self.service_box.set(typed.strip())
+        self.last_service = typed.strip()
 
     def clearForm(self):
         """Empty the inputs and forget the selected car."""
         self.selected_id = None
-        self.car_name_entry.delete(0, "end")
-        self.owner_entry.delete(0, "end")
-        self.cost_entry.delete(0, "end")
+        for entry in (self.car_name_entry, self.plate_entry, self.odometer_entry,
+                      self.owner_entry, self.cost_entry):
+            setText(entry, "")
         self.service_box.set(SERVICES[0])
+        self.last_service = SERVICES[0]
         self.status_box.set(STATUSES[0])
         self.table.selection_remove(self.table.selection())
 

@@ -1,8 +1,9 @@
 # Car Workshop Service Log
 
 A small desktop app for a car workshop. The employee records each car that comes in
-(car, owner, service, cost in SAR, status `Waiting` / `Done`) and can add, view, edit
-and delete records. The extra feature is a **Total cost** label that sums all services.
+(car, license plate, odometer, owner, service, cost in SAR, status `Waiting` / `Done`) and can add, view, edit
+and delete records. The extra features are a **Total** label that sums the cost of all services, and a
+**Statistics** button that opens a window with a summary and bar charts.
 It helps small workshops that still write cars on paper.
 
 ```
@@ -18,6 +19,7 @@ Final_project/
 │   ├── database.py   # class CarDB - all SQLite work
 │   ├── server.py     # Flask routes + input checks (port 5050)
 │   ├── client.py     # Tkinter window + HTTP requests
+│   ├── stats_window.py # Statistics window with bar charts
 │   └── report.py     # thread that writes report.txt
 ├── requirements.txt  # flask
 ├── README.md
@@ -36,6 +38,36 @@ pip install -r requirements.txt
 
 Nothing to do by hand. When `server.py` starts it calls `CarDB.createTable()`, which runs
 `CREATE TABLE IF NOT EXISTS`. The table is created only if it is missing, so old records are kept.
+If an older `cars.db` has no `plate` or `odometer` column, `createTable()` adds it
+(old cars get an empty plate and 0 km).
+A `cars.db` that still has the old `mileage` column gets it renamed to `odometer` (values kept).
+
+The license plate uses the Saudi format: 1-4 numbers, a space, then 3 English letters,
+for example `1234 ABC`. Lowercase or no space (`1234abc`) is accepted and saved as `1234 ABC`.
+
+Odometer is a whole number of km from 0 to 2,000,000. Commas are allowed when typing
+(`120,000`), and the table shows it with commas.
+
+Choosing **Other** in the Service list opens a small popup where the service is typed
+(for example `Windshield repair`). Cancel keeps the service chosen before. Typed services
+can be up to 40 characters.
+
+### Statistics window
+
+Click **Statistics** (right side of the buttons). The window has five tabs:
+
+| Tab | What it shows |
+|---|---|
+| Summary | number of cars, Waiting / Done, total cost, average cost, average odometer |
+| Cars per model | how many cars of each model (the car name, upper/lower case ignored), top 10 |
+| Odometer per model | average km per model, top 10 |
+| Services | how many cars had each service |
+| Cost over time | total cost per day for the last 14 days that have cars |
+
+Each car gets a `created_at` date (the day it was added) for the cost-over-time chart.
+Editing a car keeps its date. Cars with 0 km are left out of the odometer averages.
+The charts are horizontal bar charts drawn on a Tkinter `Canvas` (no extra library needed):
+each label gets its own line on the left, so long model names never overlap.
 The database file is `src/cars.db`.
 
 ## Run
@@ -56,6 +88,7 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | POST   | `/cars/<car_id>/edit`       | edit a car                      | 200 / 400 / 404  |
 | POST   | `/cars/<car_id>/delete`     | delete a car                    | 200 / 404        |
 | GET    | `/total`                    | extra feature: total cost       | 200              |
+| GET    | `/stats`                    | extra feature: statistics       | 200              |
 
 ## Naming style
 
@@ -72,7 +105,9 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | Classes | `src/database.py` `CarDB`, `src/client.py` `WorkshopApp` |
 | SQLite | `src/database.py` `CarDB` methods (`?` placeholders, one connection per call, commit, close) |
 | Threads & files | `src/report.py` `main()` (`Thread`, `start()`, `join()`) + `writeReport()` (`with open(..., encoding="utf-8")`) |
-| Tkinter | `src/client.py` `WorkshopApp` (labels, entries, comboboxes, buttons, Treeview, messagebox) |
+| Charts (Tkinter Canvas) | `src/stats_window.py` `StatsWindow` (Notebook tabs) + `drawBarChart()` |
+| SQL aggregates | `src/database.py` `CarDB.getStats()` (`COUNT`, `SUM`, `AVG`, `GROUP BY`) |
+| Tkinter | `src/client.py` `WorkshopApp` (labels, entries, comboboxes, buttons, Treeview, messagebox, simpledialog in `onServiceSelect()`) |
 | Client & server | `src/client.py` `WorkshopApp.addCar()` → `sendRequest("/cars/add", values)` → `src/server.py` `addCar()` → `CarDB.add()` → JSON `{"message": "Car added"}` |
 | Flask | `src/server.py` routes + `checkCarForm()` + `jsonify` replies |
 
@@ -83,7 +118,7 @@ python src/report.py      # terminal 3 - writes src/report.txt
    it to `http://127.0.0.1:5050/cars/add` using `urlopen(..., timeout=5)`.
 3. Flask's `addCar()` reads `request.form` and calls `checkCarForm()`. Bad values give JSON
    `{"error": ...}` with status 400.
-4. Good values go to `CarDB.add()`, which runs `INSERT ... VALUES (?, ?, ?, ?, ?)`, commits and closes.
+4. Good values go to `CarDB.add()`, which runs `INSERT ... VALUES (?, ?, ?, ?, ?, ?, ?)`, commits and closes.
 5. Flask replies `{"message": "Car added"}` (201). The window shows the message and reloads the table and total.
 
 ## Test results
@@ -96,11 +131,25 @@ python src/report.py      # terminal 3 - writes src/report.txt
 | Stop and restart Flask → records still there | Pass |
 | Empty car name → "Car name is required" | Pass |
 | Cost `abc` → "Cost must be a number" | Pass |
+| Plate `ABC 123` or `12345 ABC` → "Plate must be 1-4 numbers then 3 letters, like 1234 ABC" | Pass |
+| Plate typed as `4321abc` → saved as `4321 ABC` | Pass |
+| Service **Other** → popup; typed `Windshield repair` is saved and shown in the table | Pass |
+| Service **Other** → Cancel or empty text → service goes back to the previous choice | Pass |
+| Typed service longer than 40 characters → "Service must be 40 characters or less" | Pass |
+| Odometer empty / `abc` / `12.5` / `-1` / `2000001` → clear error each time | Pass |
+| Odometer `120,000` → saved as 120000, shown as `120,000`; edit keeps the other fields | Pass |
+| Old `cars.db` with a `mileage` column → renamed to `odometer`, values kept | Pass |
+| Old `cars.db` without a plate column → column added on start, old cars keep their data | Pass |
 | Cost `-5` → "Cost must be between 0 and 100000" | Pass |
 | Empty database → table shows "No cars yet", total 0.00 | Pass |
 | Unknown ID: same car selected in two windows, deleted in one, edited in the other → "Car not found" (404) | Pass |
 | Update/Delete with no row selected → "Please select a car first" | Pass |
 | Stop Flask, Refresh → "Cannot connect to the server. Is Flask running?"; start Flask, Refresh → works without restarting the window | Pass |
+| **Statistics** → summary + 4 charts (cars per model, odometer per model, services, cost per day) | Pass |
+| Statistics with an empty database → zeros and "No data yet" in every chart | Pass |
+| ` Toyota` and `toyota` → one model "Toyota" in the charts | Pass |
+| 70 cars, 10 models / 10 services / 14 days → every chart label readable, no overlap; very long names cut with "…" | Pass |
+| Old `cars.db` without `created_at` → column added, old cars dated today | Pass |
 | `python src/report.py` → `report.txt` with correct cars and total | Pass |
 | `report.py` with Flask stopped → clear connection error | Pass |
 

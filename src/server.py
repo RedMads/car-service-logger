@@ -6,6 +6,8 @@ Flask checks the values, uses CarDB (SQLite) and replies with JSON.
 Run it first:  python src/server.py
 """
 
+import math
+import re
 import sqlite3
 
 from flask import Flask, jsonify, request
@@ -17,14 +19,22 @@ app = Flask(__name__)
 db = CarDB()
 db.createTable()  # create the table at start-up if it is missing
 
-# Allowed choices (the window shows the same lists)
-SERVICES = ["Oil change", "Brakes", "Tires", "AC", "Engine", "Other"]
+# Allowed status choices (the window shows the same list).
+# Service is free text: the window offers a list, and "Other" lets the user type one.
 STATUSES = ["Waiting", "Done"]
+MAX_SERVICE_LENGTH = 40
 MAX_COST = 100000
+MAX_ODOMETER = 2000000  # km
+
+# Saudi plate: 1 to 4 numbers, a space, then 3 English letters, like "1234 ABC".
+# The space is optional when typing; the server always saves it with one space.
+PLATE_PATTERN = re.compile(r"^([1-9][0-9]{0,3}) ?([A-Z]{3})$")
 
 # Friendly names used in error messages
 FIELD_LABELS = {
     "car_name": "Car name",
+    "plate": "Plate",
+    "odometer": "Odometer",
     "owner": "Owner",
     "service": "Service",
     "cost": "Cost",
@@ -33,14 +43,13 @@ FIELD_LABELS = {
 
 
 def checkCarForm(form):
-    """Check the form values sent by the window.
-
-    Returns (data, None) if everything is valid,
-    or (None, error_message) if something is wrong.
-    """
+    """Check and clean the form values; return (data, None) or (None, error)."""
     # 1. Read every field and remove extra spaces
     data = {
         "car_name": form.get("car_name", "").strip(),
+        "plate": form.get("plate", "").strip().upper(),
+        # Commas are allowed when typing, like "120,000"
+        "odometer": form.get("odometer", "").strip().replace(",", ""),
         "owner": form.get("owner", "").strip(),
         "service": form.get("service", "").strip(),
         "cost": form.get("cost", "").strip(),
@@ -57,12 +66,29 @@ def checkCarForm(form):
         data["cost"] = float(data["cost"])
     except ValueError:
         return None, "Cost must be a number"
-    if data["cost"] < 0 or data["cost"] > MAX_COST:
+    # NaN fails every comparison, so it must be checked on its own
+    if math.isnan(data["cost"]) or data["cost"] < 0 or data["cost"] > MAX_COST:
         return None, f"Cost must be between 0 and {MAX_COST}"
 
-    # 4. Service and status must be one of the allowed choices
-    if data["service"] not in SERVICES:
-        return None, "Unknown service"
+    # 4. Plate must look like "1234 ABC" (saved in this exact form)
+    match = PLATE_PATTERN.match(data["plate"])
+    if match is None:
+        return None, "Plate must be 1-4 numbers then 3 letters, like 1234 ABC"
+    data["plate"] = f"{match.group(1)} {match.group(2)}"
+
+    # 5. Odometer must be a whole number of km between 0 and MAX_ODOMETER
+    try:
+        data["odometer"] = int(data["odometer"])
+    except ValueError:
+        return None, "Odometer must be a whole number (km)"
+    if data["odometer"] < 0 or data["odometer"] > MAX_ODOMETER:
+        return None, f"Odometer must be between 0 and {MAX_ODOMETER} km"
+
+    # 6. Service can be typed by the user, so only limit its length
+    if len(data["service"]) > MAX_SERVICE_LENGTH:
+        return None, f"Service must be {MAX_SERVICE_LENGTH} characters or less"
+
+    # 7. Status must be one of the allowed choices
     if data["status"] not in STATUSES:
         return None, "Status must be Waiting or Done"
 
@@ -98,8 +124,8 @@ def addCar():
     if error:
         return jsonify({"error": error}), 400
     try:
-        db.add(data["car_name"], data["owner"], data["service"],
-               data["cost"], data["status"])
+        db.add(data["car_name"], data["plate"], data["odometer"], data["owner"],
+               data["service"], data["cost"], data["status"])
     except sqlite3.Error:
         return jsonify({"error": "Database error"}), 500
     return jsonify({"message": "Car added"}), 201
@@ -112,8 +138,8 @@ def editCar(car_id):
     if error:
         return jsonify({"error": error}), 400
     try:
-        found = db.edit(car_id, data["car_name"], data["owner"],
-                        data["service"], data["cost"], data["status"])
+        found = db.edit(car_id, data["car_name"], data["plate"], data["odometer"],
+                        data["owner"], data["service"], data["cost"], data["status"])
     except sqlite3.Error:
         return jsonify({"error": "Database error"}), 500
     if not found:
@@ -141,6 +167,16 @@ def getTotal():
     except sqlite3.Error:
         return jsonify({"error": "Database error"}), 500
     return jsonify({"total": total})
+
+
+@app.route("/stats", methods=["GET"])
+def getStats():
+    """Extra feature: numbers and chart data for the Statistics window."""
+    try:
+        stats = db.getStats()
+    except sqlite3.Error:
+        return jsonify({"error": "Database error"}), 500
+    return jsonify(stats)
 
 
 if __name__ == "__main__":

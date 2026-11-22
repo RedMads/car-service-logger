@@ -18,10 +18,7 @@ REPORT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "report.t
 
 
 def getCars():
-    """Ask Flask's JSON route for the cars.
-
-    Returns (cars, None) on success or (None, error_message) on failure.
-    """
+    """Get all cars from Flask's JSON route; return (cars, error)."""
     try:
         with urlopen(CARS_URL, timeout=5) as reply:
             data = json.loads(reply.read().decode("utf-8"))
@@ -36,11 +33,7 @@ def getCars():
 
 
 def writeReport(cars, file_name, result):
-    """Runs inside the thread: write the cars to a UTF-8 text file.
-
-    result is a dict shared with the main thread.
-    result["saved"] becomes True if the file was written, else False.
-    """
+    """Runs in the thread: write the cars to a file and set result["saved"]."""
     try:
         with open(file_name, "w", encoding="utf-8") as report_file:
             report_file.write("Car Workshop Report\n")
@@ -50,12 +43,20 @@ def writeReport(cars, file_name, result):
                 report_file.write("No cars saved.\n")
             else:
                 total = 0
-                for number, car in enumerate(cars, start=1):
+                number = 1
+                for car in cars:
+                    # Old cars saved before plates existed have an empty plate
+                    plate = car["plate"]
+                    if plate == "":
+                        plate = "-"
+
                     report_file.write(
-                        f"{number}. {car['car_name']} | {car['owner']} | "
-                        f"{car['service']} | {car['cost']:.2f} SAR | {car['status']}\n"
+                        f"{number}. {car['car_name']} | {plate} | {car['odometer']:,} km | "
+                        f"{car['owner']} | {car['service']} | {car['cost']:.2f} SAR | "
+                        f"{car['status']}\n"
                     )
                     total += car["cost"]
+                    number += 1
                 report_file.write(f"\nNumber of cars: {len(cars)}\n")
                 report_file.write(f"Total cost: {total:.2f} SAR\n")
 
